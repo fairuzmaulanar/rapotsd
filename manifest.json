@@ -1,0 +1,23 @@
+{
+  "name": "RaporKilat SD — Rapor Digital Kurikulum Merdeka",
+  "short_name": "RaporKilat",
+  "description": "Rapor SD Kurikulum Merdeka: nilai TP & LM, deskripsi otomatis, kokurikuler 8 dimensi, persetujuan kepala sekolah, dan portal orang tua.",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f7fb",
+  "theme_color": "#1f2638",
+  "lang": "id",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Grid Nilai", "url": "./index.html#/nilai", "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Portal Orang Tua", "url": "./index.html#/ortu", "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
