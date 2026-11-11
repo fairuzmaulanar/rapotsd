@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>RaporKilat SD — Rapor Digital Kurikulum Merdeka</title>
+  <meta name="description" content="Aplikasi rapor SD Kurikulum Merdeka: grid nilai TP & LM, deskripsi otomatis, kokurikuler 8 dimensi, persetujuan kepala sekolah, QR verifikasi, dan portal orang tua.">
+  <meta name="theme-color" content="#1f2638">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="RaporKilat">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://script.google.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block">
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+  <a class="skip" href="#view">Lewati ke konten</a>
+  <div id="app" aria-live="polite">
+    <div class="boot-splash" role="status"><span class="logo">R</span><span>Memuat RaporKilat SD…</span></div>
+  </div>
+
+  <div id="btnPasang" class="pasang" hidden>
+    <span class="ic" aria-hidden="true">install_mobile</span>
+    <button class="btn sm primary" data-pasang type="button">Pasang aplikasi</button>
+    <button class="btn icon sm ghost" data-tutup type="button" aria-label="Tutup">
+      <span class="ic sm" aria-hidden="true">close</span></button>
+  </div>
+  <noscript><p style="padding:24px">Aplikasi ini memerlukan JavaScript. Aktifkan JavaScript di peramban Anda.</p></noscript>
+
+  <!-- Urutan penting: config → inti → komponen → halaman → app -->
+  <script src="./js/config.js"></script>
+  <script src="./js/core.js"></script>
+  <script src="./js/hitung.js"></script>
+  <script src="./js/grid.js"></script>
+  <script src="./js/cetak.js"></script>
+  <script src="./js/pages-publik.js"></script>
+  <script src="./js/pages-guru.js"></script>
+  <script src="./js/pages-wali.js"></script>
+  <script src="./js/pages-kepsek.js"></script>
+  <script src="./js/pages-operator.js"></script>
+  <script src="./js/pages-ortu.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
