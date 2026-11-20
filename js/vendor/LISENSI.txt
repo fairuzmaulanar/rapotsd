@@ -1,0 +1,5 @@
+Pustaka pihak ketiga yang disertakan (tanpa CDN):
+
+- jszip.min.js   — JSZip, (c) Stuart Knightley dkk. Lisensi MIT atau GPLv3 (dipakai di bawah MIT). https://stuk.github.io/jszip/
+- pdf-lib.min.js — pdf-lib 1.17.1, (c) 2019 Andrew Dillon. Lisensi MIT. https://pdf-lib.js.org/
+- qrcode.js      — pembuat kode QR (diturunkan dari qrcode-terminal/QRCode for JavaScript, (c) Kazuhiko Arase). Lisensi MIT.

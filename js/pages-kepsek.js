@@ -81,7 +81,7 @@ route('/persetujuan', {
             <div class="row wrap xs mt-8">${Object.keys(dist).map((k, i) => html`<span class="row gap-4"><span style="width:8px;height:8px;border-radius:2px;background:${warna[i] || '#94a3b8'}"></span>${k} ${dist[k]}</span>`)}</div></div>
           <div><div class="row between"><div class="lbl">Uji petik rapor siswa</div><span class="xs muted">${rd.rapor.length} siswa</span></div>
             <div class="col gap-4 mt-8">${sortBy(rd.rapor, x => -(x.rata || 0)).filter((x, i, a) => i < 2 || i === a.length - 1).map(x => html`<div class="row card" style="box-shadow:none;background:var(--surface-2);padding:6px 10px">
-              <span class="userbtn" style="padding:0;min-height:0"><span class="av" style="width:28px;height:28px;font-size:11px">${initials(x.siswa.nama)}</span></span>
+              <span class="userbtn" style="padding:0;min-height:0"><span class="av" style="width:28px;height:28px;font-size:0.75rem">${initials(x.siswa.nama)}</span></span>
               <div class="grow trunc small"><b>${x.siswa.nama}</b></div><b class="pri-t">${x.rata === null ? '–' : x.rata}</b>
               <button class="btn icon sm ghost" data-lihat="${x.anggota_id}" title="Lihat lembar rapor">${ic('picture_as_pdf', 'sm')}</button></div>`)}</div></div>`);
         dt.onclick = e => {

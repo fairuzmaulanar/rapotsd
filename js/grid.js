@@ -56,7 +56,7 @@ class SheetGrid {
     const tr = this.tbody.querySelector(`tr[data-ri="${ri}"]`);
     if (!tr || !this.rows[ri]) return;
     const tmp = document.createElement('tbody');
-    tmp.innerHTML = String(this.rowHtml(this.rows[ri], ri));
+    mount(tmp, this.rowHtml(this.rows[ri], ri));
     tr.replaceWith(tmp.firstElementChild);
     this.paint();
   }
@@ -103,7 +103,7 @@ class SheetGrid {
     const td = this.td();
     const v = col.val ? col.val(this.rows[this.r]) : this.rows[this.r][col.key];
     this.editing = { r: this.r, c: this.c };
-    td.innerHTML = '';
+    td.replaceChildren();
     const inp = document.createElement('input');
     inp.inputMode = col.inputMode || 'decimal';
     inp.autocomplete = 'off';

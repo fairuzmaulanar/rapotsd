@@ -43,7 +43,7 @@ route('/portal', {
               ${r.kode ? html`<span class="small muted">${ic('fingerprint', 'sm')} Kode <b class="mono">${r.kode}</b></span>` : ''}</div>
           </div>
           <div class="col gap-8 portal-aksi">
-            <button class="btn primary" data-unduh>${ic('download', 'sm')}Unduh / Cetak PDF</button>
+            <button class="btn primary" data-unduh>${ic('download', 'sm')}Unduh PDF rapor</button>
             ${r.kode ? html`<button class="btn ghost" data-bagikan>${ic('share', 'sm')}Bagikan tautan verifikasi</button>` : ''}
             ${x.tandaTerima ? html`<span class="badge ok" style="justify-content:center;padding:8px">${ic('task_alt', 'sm')}Diterima ${jamID(x.tandaTerima.waktu)}</span>`
               : html`<button class="btn ghost" data-terima>${ic('assignment_turned_in', 'sm')}Konfirmasi tanda terima</button>`}
@@ -51,12 +51,13 @@ route('/portal', {
         </section>
         <div class="kpis mt-16">
           <div class="card kpi"><div class="k-l">Rata-rata nilai akhir<span class="k-ic">${ic('analytics', 'sm')}</span></div><div class="k-v">${r.rata === null ? '–' : fmt1(r.rata)}</div><div class="k-s">${r.rata === null ? '' : pred(r.rata).label || ''}</div></div>
-          <div class="card kpi"><div class="k-l">Mapel mencapai KKTP<span class="k-ic">${ic('task_alt', 'sm')}</span></div><div class="k-v">${tuntas}<small class="muted" style="font-size:14px"> / ${mp.length}</small></div><div class="k-s">${tuntas === mp.length ? 'Semua tercapai' : (mp.length - tuntas) + ' perlu penguatan'}</div></div>
-          <div class="card kpi"><div class="k-l">Ketidakhadiran<span class="k-ic">${ic('how_to_reg', 'sm')}</span></div><div class="k-v">${totalAbsen}<small class="muted" style="font-size:14px"> hari</small></div><div class="k-s">Sakit ${hadir.sakit || 0} · Izin ${hadir.izin || 0} · Alpa ${hadir.alpa || 0}</div></div>
+          <div class="card kpi"><div class="k-l">Mapel mencapai KKTP<span class="k-ic">${ic('task_alt', 'sm')}</span></div><div class="k-v">${tuntas}<small class="muted" style="font-size:0.875rem"> / ${mp.length}</small></div><div class="k-s">${tuntas === mp.length ? 'Semua tercapai' : (mp.length - tuntas) + ' perlu penguatan'}</div></div>
+          <div class="card kpi"><div class="k-l">Ketidakhadiran<span class="k-ic">${ic('how_to_reg', 'sm')}</span></div><div class="k-v">${totalAbsen}<small class="muted" style="font-size:0.875rem"> hari</small></div><div class="k-s">Sakit ${hadir.sakit || 0} · Izin ${hadir.izin || 0} · Alpa ${hadir.alpa || 0}</div></div>
           <div class="card kpi"><div class="k-l">Kokurikuler<span class="k-ic">${ic('diversity_3', 'sm')}</span></div><div class="k-v">${r.kokurikuler.length}</div><div class="k-s">kegiatan dinilai</div></div>
         </div>
-        <div class="seg mt-16" data-tab role="tablist">${[['ringkas', 'Mata pelajaran'], ['koku', 'Kokurikuler & ekskul'], ['grafik', 'Grafik capaian'], ['lembar', 'Lembar rapor']].map(t => html`<button role="tab" data-v="${t[0]}" class="${tab === t[0] ? 'on' : ''}">${t[1]}</button>`)}</div>
+        <div class="seg mt-16" data-tab>${[['ringkas', 'Mata pelajaran'], ['koku', 'Kokurikuler & ekskul'], ['grafik', 'Grafik capaian'], ['lembar', 'Lembar rapor']].map(t => html`<button data-v="${t[0]}" class="${tab === t[0] ? 'on' : ''}">${t[1]}</button>`)}</div>
         <div class="mt-16" data-tabisi></div>`);
+      Tab.pasang($('[data-tab]', isi), $('[data-tabisi]', isi), tab, { kunci: 'ortu', label: 'Isi rapor' });
       tabIsi();
     };
     function predikatDefault() {
@@ -89,26 +90,35 @@ route('/portal', {
         const opsi = { kertas: x.sekolah.kertas || 'A4', kop: 'lengkap', qr: true, kokurikuler: true, identitas: false, tandaDigital: true };
         mount(box, html`<div class="toolbar card mb-12 no-print"><span class="small muted">Tampilan sama dengan rapor cetak. Untuk PDF: Cetak → "Simpan sebagai PDF".</span><span class="grow"></span>
           <div class="seg" data-kertas>${['A4', 'F4'].map(k => html`<button data-v="${k}" class="${opsi.kertas === k ? 'on' : ''}">${k}</button>`)}</div>
-          <button class="btn primary sm" data-unduh>${ic('print', 'sm')}Cetak / PDF</button></div>
+          <button class="btn ghost sm" data-cetak>${ic('print', 'sm')}Cetak</button><button class="btn primary sm" data-unduh>${ic('download', 'sm')}Unduh PDF</button></div>
           <div class="print-area"><div class="paper-stage" data-stage>${Cetak.lembar(x, r, opsi)}</div></div>`);
         Cetak.gambarQR(box).catch(() => {});
         $('[data-kertas]', box).onclick = e => { const b = e.target.closest('button'); if (!b) return; opsi.kertas = b.dataset.v; x.sekolah.kertas = b.dataset.v; tabIsi(); };
       }
     }
 
+    async function cetakLembar() {
+      if (tab !== 'lembar') { tab = 'lembar'; S.ctx.ortuTab = tab; S.simpanCtx(); gambar(); }
+      await Cetak.gambarQR($('[data-tabisi]', isi)).catch(() => {});
+      toast('Pada dialog cetak pilih "Simpan sebagai PDF".', 'info');
+      Cetak.cetak(d.isi.sekolah.kertas || 'A4');
+    }
     isi.addEventListener('change', e => {
       if (e.target.dataset.pilih !== undefined) { idx = +e.target.value; S.ctx.ortuIdx = idx; S.simpanCtx(); mount(isi, skeleton(6)); muat(); }
     });
     isi.addEventListener('click', async e => {
       const t = e.target.closest('[data-tab] button');
       if (t) { tab = t.dataset.v; S.ctx.ortuTab = tab; S.simpanCtx(); $$('[data-tab] button', isi).forEach(b => b.classList.toggle('on', b === t)); tabIsi(); return; }
-      if (e.target.closest('[data-unduh]')) {
-        if (tab !== 'lembar') { tab = 'lembar'; S.ctx.ortuTab = tab; S.simpanCtx(); gambar(); }
-        const box = $('[data-tabisi]', isi);
-        await Cetak.gambarQR(box).catch(() => {});
-        toast('Pada dialog cetak pilih "Simpan sebagai PDF".', 'info');
-        Cetak.cetak(d.isi.sekolah.kertas || 'A4');
+      const ud = e.target.closest('[data-unduh]');
+      if (ud) {
+        // P4.3: PDF langsung tanpa dialog cetak (nyaman di HP); bila gagal, beralih ke dialog cetak
+        ud.classList.add('busy');
+        const opsi = { kertas: d.isi.sekolah.kertas || 'A4', kop: 'lengkap', qr: true, kokurikuler: true, identitas: false, tandaDigital: true };
+        try { await PDFRapor.unduhSatu(d.isi, d.isi.rapor, opsi); toast('PDF rapor diunduh.', 'ok'); }
+        catch (ex) { toast('PDF tidak dapat dibuat di perangkat ini. Membuka dialog cetak…', 'warn'); cetakLembar(); }
+        finally { ud.classList.remove('busy'); }
       }
+      if (e.target.closest('[data-cetak]')) cetakLembar();
       if (e.target.closest('[data-bagikan]')) {
         const url = Cetak.urlVerifikasi(d.isi.rapor.kode);
         const teks = 'Verifikasi keaslian rapor ' + d.isi.rapor.siswa.nama + ' (' + d.isi.sekolah.nama_sekolah + '): ' + url;

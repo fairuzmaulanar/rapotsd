@@ -32,15 +32,30 @@ route('/sekolah', {
           <div class="field"><label>KKTP default mapel baru</label><input class="input" type="number" min="0" max="100" name="kktp_default" value="${s.kktp_default || 75}"></div>
           <div class="field"><label>Kertas default</label><select class="select" name="kertas">${['A4', 'F4'].map(k => html`<option ${s.kertas === k ? raw('selected') : ''}>${k}</option>`)}</select></div>
           <div class="field"><label>Ranking di leger</label><select class="select" name="tampil_ranking"><option value="tidak">Sembunyikan</option><option value="ya" ${s.tampil_ranking === 'ya' ? raw('selected') : ''}>Tampilkan</option></select></div>
-          <div class="field"><label>WA operator (portal ortu)</label><input class="input" name="wa_operator" value="${s.wa_operator || ''}" placeholder="62812…"></div></div></form></div>
+          <div class="field"><label>WA operator (portal ortu)</label><input class="input" name="wa_operator" value="${s.wa_operator || ''}" placeholder="62812…"></div></div></form>
+      <form class="card" data-notif><div class="card-h"><h3>${ic('notifications')}Notifikasi rapor</h3><button class="btn sm primary" type="submit">${ic('save', 'sm')}Simpan</button></div>
+        <div class="pad col gap-12"><p class="small muted" style="margin:0">Dikirim saat rapor <b>diajukan</b> (ke kepala sekolah), <b>dikembalikan</b> atau <b>dibuka kuncinya</b> (ke wali kelas), dan <b>disetujui</b> (ke wali kelas & operator).</p>
+          <div class="form-grid">
+            <div class="field"><label>Email</label><select class="select" name="notif_email"><option value="ya">Aktif</option><option value="tidak" ${s.notif_email === 'tidak' ? raw('selected') : ''}>Nonaktif</option></select></div>
+            <div class="field"><label>WhatsApp (Fonnte)</label><select class="select" name="notif_wa"><option value="tidak">Nonaktif</option><option value="ya" ${s.notif_wa === 'ya' ? raw('selected') : ''}>Aktif</option></select>
+              <span class="xs ${S.boot.fonnte ? 'ok-t' : 'muted'}">${S.boot.fonnte ? 'Token Fonnte terpasang' : 'Token FONNTE_TOKEN belum diisi di Script Properties'}</span></div>
+            <div class="field span2"><label>Alamat aplikasi (tautan di pesan)</label><div class="row"><input class="input grow" name="url_aplikasi" value="${s.url_aplikasi || ''}" placeholder="https://…github.io/…/">
+              <button class="btn ghost" type="button" data-url-ini>Pakai alamat ini</button></div></div></div>
+          <p class="xs muted" style="margin:0">Email & WhatsApp dikirim ke data di menu Pengguna & Peran. Email berakhiran @sekolah.id dan @demo.sch.id dilewati.</p>
+          <div><button class="btn ghost sm" type="button" data-uji-notif>${ic('send', 'sm')}Kirim email uji ke saya</button></div></div></form></div>
       <div class="col gap-16"><div class="card"><div class="card-h"><h3>${ic('event')}Tahun ajaran & semester</h3><button class="btn sm primary" data-periode-baru>${ic('add', 'sm')}Periode baru</button></div>
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Tahun ajaran</th><th>Semester</th><th>Tgl rapor STS / SAS</th><th>Status</th><th></th></tr></thead>
         <tbody>${sortBy(S.boot.periode, x => x.tahun_ajaran + x.semester).reverse().map(x => html`<tr><td><b>${x.tahun_ajaran}</b></td><td>${x.semester}</td><td class="small">${tglID(x.tgl_rapor_sts) || '–'} / ${tglID(x.tgl_rapor_sas) || '–'}</td>
-          <td>${isTrue(x.aktif) ? html`<span class="badge ok">Aktif</span>` : html`<span class="badge">Arsip</span>`}</td><td class="right"><button class="btn sm ghost" data-periode="${x.id}">${ic('edit', 'sm')}</button></td></tr>`)}</tbody></table></div></div>
+          <td>${isTrue(x.aktif) ? html`<span class="badge ok">Aktif</span>` : html`<span class="badge">Arsip</span>`}</td><td class="right"><button class="btn sm ghost" data-periode="${x.id}" title="Ubah periode" aria-label="Ubah periode ${x.tahun_ajaran} semester ${x.semester}">${ic('edit', 'sm')}</button></td></tr>`)}</tbody></table></div></div>
         <div class="card"><div class="card-h"><h3>${ic('military_tech')}Predikat & kalimat deskripsi</h3><button class="btn sm primary" data-simpan-pred>${ic('save', 'sm')}Simpan</button></div>
           <div class="pad"><p class="small muted mb-12">Kalimat awal dipakai untuk menyusun deskripsi: <i>"[kalimat awal] [teks TP]"</i>.</p>
           <div class="col" data-pred>${S.boot.predikat.map(pr => barisPred(pr))}</div>
-          <button class="btn sm ghost mt-12" data-tambah-pred>${ic('add', 'sm')}Tambah baris</button></div></div></div></div>`);
+          <button class="btn sm ghost mt-12" data-tambah-pred>${ic('add', 'sm')}Tambah baris</button></div></div>
+        <div class="card"><div class="card-h"><h3>${ic('backup')}Cadangan data</h3></div><div class="pad col gap-12">
+          <p class="small" style="margin:0">Buat cadangan setiap akhir semester. <b>Salinan di Google Drive</b> berisi seluruh database dan bisa langsung dipakai bila terjadi masalah. File <b>.json</b> untuk arsip di laptop.</p>
+          <div class="row wrap gap-8"><button class="btn primary" data-cadangan>${ic('cloud_upload', 'sm')}Buat salinan di Google Drive</button>
+            <button class="btn ghost" data-ekspor>${ic('download', 'sm')}Unduh cadangan (.json)</button></div><div data-hasil-cadangan></div>
+          <p class="xs muted" style="margin:0">Sandi, PIN, dan token tidak ikut tercadang karena tersimpan terpisah di Script Properties.</p></div></div></div></div>`);
     function barisPred(pr = {}) {
       return html`<div class="row wrap card pad" style="box-shadow:none;border:1px solid var(--line);padding:8px" data-prow>
         <input class="input" style="width:70px" type="number" data-k="nilai_min" value="${pr.nilai_min ?? ''}" placeholder="Min" aria-label="Nilai minimum">
@@ -57,8 +72,34 @@ route('/sekolah', {
     };
     $('[data-profil]', view).onsubmit = e => simpanForm(e, 'Profil sekolah');
     $('[data-aturan]', view).onsubmit = e => simpanForm(e, 'Aturan rapor');
+    $('[data-notif]', view).onsubmit = e => simpanForm(e, 'Pengaturan notifikasi');
+    $('[data-url-ini]', view).onclick = () => { $('[name=url_aplikasi]', view).value = location.origin + location.pathname; };
     view.addEventListener('click', async e => {
-      if (e.target.closest('[data-tambah-pred]')) { $('[data-pred]', view).insertAdjacentHTML('beforeend', String(barisPred())); }
+      if (e.target.closest('[data-tambah-pred]')) { $('[data-pred]', view).insertAdjacentHTML('beforeend', TT.html(barisPred())); }
+      const un = e.target.closest('[data-uji-notif]');
+      if (un) {
+        un.classList.add('busy');
+        try {
+          const h = await API.call('ujiNotif', {});
+          if (h && h.email) toast('Email uji terkirim ke ' + (S.user.email || 'email Anda') + '. Periksa kotak masuk/spam.', 'ok');
+          else toast('Tidak ada email terkirim. Pastikan notifikasi email aktif dan email akun Anda adalah alamat asli (bukan @sekolah.id).', 'warn');
+        } catch (ex) { toast(ex.message, 'err', 'Uji notifikasi gagal'); } finally { un.classList.remove('busy'); }
+      }
+      const cd = e.target.closest('[data-cadangan]');
+      if (cd) {
+        cd.classList.add('busy');
+        try { const r = await API.call('buatCadangan', {}); mount($('[data-hasil-cadangan]', view), html`<div class="alert ok">${ic('task_alt')}<div>Salinan dibuat: <a href="${r.url}" target="_blank" rel="noopener">${r.nama}</a></div></div>`); }
+        catch (ex) { toast(ex.message, 'err', 'Gagal membuat salinan'); } finally { cd.classList.remove('busy'); }
+      }
+      const ek = e.target.closest('[data-ekspor]');
+      if (ek) {
+        ek.classList.add('busy');
+        try {
+          const r = await API.call('eksporCadangan', {}, { timeout: 120000 });
+          unduhBlob(new Blob([JSON.stringify(r)], { type: 'application/json' }), 'Cadangan_RaporKilat_' + new Date().toISOString().slice(0, 10) + '.json');
+          toast('Cadangan diunduh (' + Object.keys(r.tabel).length + ' tabel).', 'ok');
+        } catch (ex) { toast(ex.message, 'err', 'Gagal mengunduh cadangan'); } finally { ek.classList.remove('busy'); }
+      }
       const hp = e.target.closest('[data-hapus-pred]'); if (hp) hp.closest('[data-prow]').remove();
       const sp = e.target.closest('[data-simpan-pred]');
       if (sp) {
@@ -89,7 +130,7 @@ route('/sekolah', {
    ============================================================ */
 function tampilSandi(judul, email, sandi) {
   return modal({ judul, isi: html`<div class="col gap-12"><div class="alert warn">${ic('key')}<div>Catat dan berikan sandi ini kepada pengguna. <b>Sandi hanya tampil sekali.</b> Pengguna disarankan mengganti sandi setelah masuk.</div></div>
-    <div class="card pad"><div class="small muted">Email</div><b>${email}</b><div class="small muted mt-8">Kata sandi</div><b class="mono" style="font-size:20px">${sandi}</b></div></div>`,
+    <div class="card pad"><div class="small muted">Email</div><b>${email}</b><div class="small muted mt-8">Kata sandi</div><b class="mono" style="font-size:1.25rem">${sandi}</b></div></div>`,
     aksi: [{ label: 'Salin', kelas: 'ghost', ikon: 'content_copy', onClick: () => { navigator.clipboard && navigator.clipboard.writeText('Email: ' + email + '\nSandi: ' + sandi); toast('Disalin.', 'ok'); return false; } }, { label: 'Selesai', kelas: 'primary' }] });
 }
 route('/pengguna', {
@@ -105,7 +146,7 @@ route('/pengguna', {
           <td>${u.peran.map(x => html`<span class="badge ${x === 'operator' ? 'dark' : x === 'kepsek' ? 'pri' : ''}">${{ operator: 'Operator', guru: 'Guru', kepsek: 'Kepala sekolah' }[x] || x}</span> `)}</td>
           <td class="small">${wali.length ? 'Wali ' + wali.join(', ') : ''}${wali.length && mp ? ' · ' : ''}${mp ? mp + ' mapel' : ''}${!wali.length && !mp ? html`<span class="muted">–</span>` : ''}</td>
           <td>${u.aktif ? html`<span class="badge ok">Aktif</span>` : html`<span class="badge err">Nonaktif</span>`}</td>
-          <td class="right" style="white-space:nowrap"><button class="btn sm ghost" data-edit="${u.id}">${ic('edit', 'sm')}</button><button class="btn sm ghost" data-reset="${u.id}" title="Reset sandi">${ic('lock_reset', 'sm')}</button></td></tr>`; })}</tbody></table></div></div>`);
+          <td class="right" style="white-space:nowrap"><button class="btn sm ghost" data-edit="${u.id}" title="Ubah pengguna" aria-label="Ubah ${u.nama}">${ic('edit', 'sm')}</button><button class="btn sm ghost" data-reset="${u.id}" title="Reset sandi" aria-label="Reset sandi ${u.nama}">${ic('lock_reset', 'sm')}</button></td></tr>`; })}</tbody></table></div></div>`);
     };
     mount(view, html`${kepalaHalaman('Administrasi', 'Pengguna & Peran', 'Satu akun boleh punya beberapa peran. Wali kelas ditetapkan di menu Rombel.', html`<button class="btn primary" data-baru>${ic('person_add', 'sm')}Tambah pengguna</button>`)}<div data-isi></div>`);
     gambar();
@@ -117,6 +158,7 @@ route('/pengguna', {
           <div class="field span2"><label>Nama lengkap & gelar</label><input class="input" name="nama" value="${u.nama || ''}"></div>
           <div class="field"><label>Email (untuk masuk)</label><input class="input" type="email" name="email" value="${u.email || ''}"></div>
           <div class="field"><label>NIP</label><input class="input" name="nip" value="${u.nip || ''}" inputmode="numeric"></div>
+          <div class="field"><label>No. WhatsApp (notifikasi)</label><input class="input" name="telp" value="${u.telp || ''}" inputmode="tel" placeholder="0812…"></div>
           <div class="field full"><label>Peran</label><div class="row wrap">${[['guru', 'Guru'], ['kepsek', 'Kepala sekolah'], ['operator', 'Operator']].map(r => html`<label class="check"><input type="checkbox" name="peran" data-multi="1" value="${r[0]}" ${u.peran.includes(r[0]) ? raw('checked') : ''}>${r[1]}</label>`)}</div></div>
           <div class="field"><label>Kata sandi ${u.id ? '(kosongkan bila tidak diganti)' : '(kosong = dibuat otomatis)'}</label><input class="input" type="password" name="password" autocomplete="new-password"></div>
           <label class="check"><input type="checkbox" name="aktif" ${u.aktif ? raw('checked') : ''}>Akun aktif</label></div>`,
@@ -149,8 +191,15 @@ function formSiswa(x = {}) {
     ${f('tempat_lahir', 'Tempat lahir')}<div class="field"><label>Tanggal lahir</label><input class="input" type="date" name="tanggal_lahir" value="${String(x.tanggal_lahir || '').slice(0, 10)}"></div>
     ${f('pendidikan_sebelumnya', 'Pendidikan sebelumnya')}${f('alamat', 'Alamat')}${f('nama_ayah', 'Nama ayah')}${f('pekerjaan_ayah', 'Pekerjaan ayah')}
     ${f('nama_ibu', 'Nama ibu')}${f('pekerjaan_ibu', 'Pekerjaan ibu')}${f('nama_wali', 'Nama wali')}${f('pekerjaan_wali', 'Pekerjaan wali')}${f('alamat_wali', 'Alamat wali')}${f('telp_ortu', 'No. HP orang tua')}
-    <div class="field"><label>Rombel (TA aktif)</label><select class="select" name="rombel_id"><option value="">— Tidak diubah —</option>${pilihanRombel(B.rombelTA(), x.rombel_id)}</select></div></div>`;
+    <div class="field"><label>Rombel (TA aktif)</label><select class="select" name="rombel_id"><option value="">— Tidak diubah —</option>${pilihanRombel(B.rombelTA(), x.rombel_id)}</select></div>
+    <div class="field full mutasi"><label>Status & mutasi</label><div class="form-grid">
+      <select class="select" name="status" aria-label="Status siswa">${STATUS_SISWA.map(([v, l]) => html`<option value="${v}" ${(x.status || 'aktif') === v ? raw('selected') : ''}>${l}</option>`)}</select>
+      <input class="input" type="date" name="tgl_mutasi" aria-label="Tanggal mutasi" value="${String(x.tgl_mutasi || '').slice(0, 10)}">
+      <input class="input span2" name="ket_mutasi" aria-label="Keterangan mutasi" value="${x.ket_mutasi || ''}" placeholder="Keterangan, mis. pindah ke SDN 2 Contoh"></div>
+      <span class="xs muted">Selain "Aktif", siswa dikeluarkan dari rombel tahun ajaran ini. Nilai yang sudah ada tetap tersimpan.</span></div></div>`;
 }
+const STATUS_SISWA = [['aktif', 'Aktif'], ['pindah', 'Pindah sekolah'], ['keluar', 'Keluar / mengundurkan diri'], ['lulus', 'Lulus']];
+const labelStatus = v => (STATUS_SISWA.find(x => x[0] === v) || [, 'Aktif'])[1];
 function serialKeTanggal(v) {
   if (typeof v === 'number' && v > 10000 && v < 80000) { const d = new Date(Math.round((v - 25569) * 864e5)); return d.toISOString().slice(0, 10); }
   const m = String(v || '').match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
@@ -160,7 +209,7 @@ async function lembarPin(hasil) {
   await modal({ judul: 'PIN Portal Orang Tua', lebar: 'wide', isi: html`<div class="alert warn mb-12">${ic('key')}<div>PIN hanya tampil sekali. Cetak atau salin lalu bagikan ke orang tua. Membuat PIN baru membatalkan PIN lama.</div></div>
     <div class="print-area"><div class="grid2" data-kartu>${hasil.map(h => html`<div class="card pad" style="border:1px dashed var(--line-2);box-shadow:none;break-inside:avoid">
       <div class="xs muted">${S.pengaturan.nama_sekolah} · Portal Orang Tua</div><b>${h.nama}</b>
-      <div class="row between mt-8"><span class="small">NISN <b class="mono">${h.nisn || '-'}</b></span><span class="small">PIN <b class="mono" style="font-size:18px">${h.pin}</b></span></div>
+      <div class="row between mt-8"><span class="small">NISN <b class="mono">${h.nisn || '-'}</b></span><span class="small">PIN <b class="mono" style="font-size:1.125rem">${h.pin}</b></span></div>
       <div class="xs muted mt-8">Buka ${location.origin + location.pathname}#/ortu</div></div>`)}</div></div>`,
     aksi: [{ label: 'Salin semua', kelas: 'ghost', ikon: 'content_copy', onClick: () => { navigator.clipboard.writeText(hasil.map(h => h.nama + '\tNISN ' + h.nisn + '\tPIN ' + h.pin).join('\n')); toast('Disalin.', 'ok'); return false; } },
       { label: 'Cetak kartu', kelas: 'ghost', ikon: 'print', onClick: () => { Cetak.cetak('A4'); return false; } }, { label: 'Selesai', kelas: 'primary' }] });
@@ -174,17 +223,17 @@ route('/siswa', {
     mount(view, html`${kepalaHalaman('Administrasi', 'Data Siswa', 'Impor dari Excel/Dapodik, kelola biodata, dan buat PIN portal orang tua.',
       html`<button class="btn ghost" data-template>${ic('download', 'sm')}Template impor</button><button class="btn ghost" data-impor>${ic('upload_file', 'sm')}Impor Excel</button><button class="btn primary" data-baru>${ic('person_add', 'sm')}Tambah siswa</button>`)}
       <div class="card toolbar mb-12"><input class="input" style="max-width:280px" placeholder="Cari nama / NISN" data-cari>
-        <select class="select" style="max-width:200px" data-kelas><option value="">Semua kelas</option><option value="-">Belum punya rombel</option>${pilihanRombel(B.rombelTA(), '')}</select>
+        <select class="select" style="max-width:220px" data-kelas><option value="">Semua kelas</option><option value="-">Belum punya rombel</option><option value="~">Siswa mutasi (pindah/keluar/lulus)</option>${pilihanRombel(B.rombelTA(), '')}</select>
         <span class="grow"></span><span class="small muted" data-jml></span><button class="btn sm ghost" data-pin>${ic('pin', 'sm')}Buat PIN orang tua</button></div>
       <div class="card" data-isi>${skeleton(8)}</div>`);
     const gambar = () => {
-      const t = data.filter(s => (!q || (s.nama + ' ' + s.nisn + ' ' + s.nis).toLowerCase().includes(q)) && (!fKelas || (fKelas === '-' ? !s.rombel_id : s.rombel_id === fKelas)));
+      const t = data.filter(s => (!q || (s.nama + ' ' + s.nisn + ' ' + s.nis).toLowerCase().includes(q)) && (!fKelas || (fKelas === '~' ? (s.status || 'aktif') !== 'aktif' : fKelas === '-' ? !s.rombel_id && (s.status || 'aktif') === 'aktif' : s.rombel_id === fKelas)));
       $('[data-jml]', view).textContent = t.length + ' siswa' + (pilih.size ? ' · ' + pilih.size + ' dipilih' : '');
       mount($('[data-isi]', view), html`<div class="tbl-wrap" style="max-height:calc(100vh - 290px)"><table class="tbl"><thead><tr><th class="c"><input type="checkbox" data-semua aria-label="Pilih semua"></th><th>Nama</th><th>NISN / NIS</th><th class="c">L/P</th><th>Agama</th><th>Kelas</th><th>Orang tua</th><th class="c">PIN</th><th></th></tr></thead>
         <tbody>${t.slice(0, 800).map(s => html`<tr><td class="c"><input type="checkbox" data-pilih="${s.id}" ${pilih.has(s.id) ? raw('checked') : ''}></td><td><b>${s.nama}</b>${s.panggilan ? html`<div class="xs muted">${s.panggilan}</div>` : ''}</td>
-          <td class="mono small">${s.nisn || '–'}<div class="xs muted">${s.nis || ''}</div></td><td class="c">${s.jk}</td><td class="small">${s.agama}</td><td>${s.kelas ? html`<span class="badge pri">${s.kelas}</span>` : html`<span class="badge warn">–</span>`}</td>
+          <td class="mono small">${s.nisn || '–'}<div class="xs muted">${s.nis || ''}</div></td><td class="c">${s.jk}</td><td class="small">${s.agama}</td><td>${(s.status || 'aktif') !== 'aktif' ? html`<span class="badge dark" title="${s.ket_mutasi || ''}">${labelStatus(s.status)}${s.tgl_mutasi ? ' · ' + tglID(s.tgl_mutasi) : ''}</span>` : s.kelas ? html`<span class="badge pri">${s.kelas}</span>` : html`<span class="badge warn">–</span>`}</td>
           <td class="small">${s.nama_ayah || s.nama_ibu || s.nama_wali || '–'}</td><td class="c">${s.punyaPin ? ic('check_circle', 'sm ok-t') : html`<span class="muted">–</span>`}</td>
-          <td class="right"><button class="btn sm ghost" data-edit="${s.id}">${ic('edit', 'sm')}</button></td></tr>`)}</tbody></table></div>
+          <td class="right"><button class="btn sm ghost" data-edit="${s.id}" title="Ubah data siswa" aria-label="Ubah data ${s.nama}">${ic('edit', 'sm')}</button></td></tr>`)}</tbody></table></div>
         ${t.length > 800 ? html`<p class="small muted pad">Menampilkan 800 dari ${t.length}. Persempit dengan pencarian.</p>` : ''}${!t.length ? kosong('school', 'Belum ada siswa', 'Impor data siswa dari Excel atau tambahkan satu per satu.') : ''}`);
     };
     const muat = async () => { await API.swr('daftarSiswa', {}, d => { if (p.alive()) { data = d; gambar(); } }, { ttl: 5000 }); };
@@ -284,10 +333,11 @@ route('/rombel', {
       const rb = B.rombel(aktif);
       if (!rb.id) { mount(box, kosong('meeting_room', 'Belum ada rombel', 'Klik "Rombel baru" untuk membuat kelas.')); return; }
       mount(box, html`<div class="card"><div class="card-h"><div><h3>Kelas ${rb.nama} <span class="badge">Fase ${rb.fase}</span></h3><div class="small muted">Wali kelas: <b>${B.user(rb.wali_id).nama || 'belum ditetapkan'}</b></div></div>
-        <div class="row"><button class="btn sm ghost" data-ubah>${ic('edit', 'sm')}Ubah</button><button class="btn sm ghost" data-hapus>${ic('delete', 'sm err-t')}</button></div></div>
+        <div class="row"><button class="btn sm ghost" data-ubah>${ic('edit', 'sm')}Ubah</button><button class="btn sm ghost" data-hapus title="Hapus rombel" aria-label="Hapus rombel ${rb.nama}">${ic('delete', 'sm err-t')}</button></div></div>
         <div class="pad row" data-tab>${[['pengampu', 'Pengampu & bobot'], ['anggota', 'Anggota kelas']].map(t => html`<button class="btn sm ${tab === t[0] ? 'primary' : 'ghost'}" data-v="${t[0]}">${t[1]}</button>`)}</div>
         <div data-tabisi>${skeleton(5)}</div></div>`);
       const ti = $('[data-tabisi]', box);
+      Tab.pasang($('[data-tab]', box), ti, tab, { kunci: 'rombel', label: 'Detail rombel' });
       if (tab === 'pengampu') {
         const mrs = sortBy(S.boot.mapelRombel.filter(m => m.rombel_id === rb.id), m => Number(B.mapel(m.mapel_id).urutan) || 99);
         const belum = S.boot.mapel.filter(mp => isTrue(mp.aktif) && !mrs.some(m => m.mapel_id === mp.id));
@@ -395,10 +445,10 @@ route('/mapel', {
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th class="c">Urut</th><th>Nama</th><th>Singkatan</th><th>Kelompok</th><th>Status</th><th></th></tr></thead>
         <tbody>${sortBy(S.boot.mapel, m => (Number(m.urutan) || 99) * 100 + (m.agama ? 1 : 0)).map(m => html`<tr><td class="c">${m.urutan}</td><td><b>${m.nama}</b></td><td>${m.singkatan}</td>
           <td><span class="badge">${m.kelompok}${m.agama ? ' · ' + m.agama : ''}</span></td><td>${isTrue(m.aktif) ? html`<span class="badge ok">Aktif</span>` : html`<span class="badge">Nonaktif</span>`}</td>
-          <td class="right" style="white-space:nowrap">${isTrue(m.aktif) ? html`<button class="btn sm ghost" data-sebar="${m.id}" title="Tambahkan ke semua rombel TA aktif">${ic('playlist_add', 'sm')}</button>` : ''}<button class="btn sm ghost" data-mapel="${m.id}">${ic('edit', 'sm')}</button></td></tr>`)}</tbody></table></div></div>
+          <td class="right" style="white-space:nowrap">${isTrue(m.aktif) ? html`<button class="btn sm ghost" data-sebar="${m.id}" title="Tambahkan ke semua rombel TA aktif">${ic('playlist_add', 'sm')}</button>` : ''}<button class="btn sm ghost" data-mapel="${m.id}" title="Ubah mapel" aria-label="Ubah mapel ${m.nama}">${ic('edit', 'sm')}</button></td></tr>`)}</tbody></table></div></div>
         <div class="card"><div class="card-h"><h3>${ic('sports_soccer')}Ekstrakurikuler</h3><button class="btn sm primary" data-ek-baru>${ic('add', 'sm')}Ekskul</button></div>
           <div class="col pad">${S.boot.ekskul.map(e => html`<div class="row card pad" style="box-shadow:none;border:1px solid var(--line);padding:8px 10px"><div class="grow"><b>${e.nama}</b> ${isTrue(e.wajib) ? html`<span class="badge pri">Wajib</span>` : ''}<div class="xs muted">${e.pembina || ''}</div></div>
-            <button class="btn sm ghost" data-ek="${e.id}">${ic('edit', 'sm')}</button><button class="btn sm ghost" data-ek-hapus="${e.id}">${ic('delete', 'sm err-t')}</button></div>`)}
+            <button class="btn sm ghost" data-ek="${e.id}" title="Ubah ekskul" aria-label="Ubah ekskul ${e.nama}">${ic('edit', 'sm')}</button><button class="btn sm ghost" data-ek-hapus="${e.id}" title="Hapus ekskul" aria-label="Hapus ekskul ${e.nama}">${ic('delete', 'sm err-t')}</button></div>`)}
           ${!S.boot.ekskul.length ? html`<p class="small muted">Belum ada ekskul.</p>` : ''}</div></div></div>`);
     gambar();
     view.addEventListener('click', async e => {

@@ -5,7 +5,7 @@
    ============================================================ */
 'use strict';
 
-const APP_VERSI = '1.0.1';
+const APP_VERSI = '1.5.0';
 
 /* ---------- Utilitas DOM & HTML aman ---------- */
 const $ = (s, el = document) => el.querySelector(s);
@@ -28,7 +28,96 @@ function html(strs, ...vals) {
   return new Raw(o);
 }
 const ic = (n, cls = '') => html`<span class="ic ${cls}" aria-hidden="true">${n}</span>`;
-function mount(el, content) { el.innerHTML = String(content); return el; }
+
+/* Trusted Types (modern-web-guidance: security/trusted-types).
+   Satu kebijakan bernama "raporkilat"; objek kebijakannya tersimpan di dalam closure ini.
+   - HTML hanya dari templat html`` (semua nilai sudah di-escape) atau raw() yang disengaja;
+     string biasa diperlakukan sebagai TEKS (di-escape), jadi tidak mungkin jadi HTML tanpa sengaja.
+   - URL skrip hanya dari situs ini (Lazy, service worker).
+   CSP di index.html (require-trusted-types-for 'script') mewajibkan semua sink lewat kebijakan ini. */
+const TT = (() => {
+  const aturan = {
+    createHTML: s => s,
+    createScriptURL: s => {
+      const u = new URL(s, document.baseURI);
+      if (u.origin !== location.origin) throw new TypeError('Skrip dari situs lain ditolak: ' + s);
+      return u.href;
+    }
+  };
+  const p = window.trustedTypes && window.trustedTypes.createPolicy ? window.trustedTypes.createPolicy('raporkilat', aturan) : aturan;
+  return {
+    html: c => {
+      if (c instanceof Raw) return p.createHTML(c.s);
+      if (typeof c === 'string' && /<[a-z!/]/i.test(c)) console.warn('[TT] string mentah dirender sebagai teks:', c.slice(0, 80));
+      return p.createHTML(esc(c === null || c === undefined ? '' : c));
+    },
+    url: s => p.createScriptURL(s),
+    /** Urai XML (isi berkas .xlsx) → Document. Dokumen DOMParser tidak menjalankan skrip;
+        hasil createHTML tidak pernah keluar dari fungsi ini, jadi tidak bisa dipakai ke innerHTML. */
+    xml: s => new DOMParser().parseFromString(p.createHTML(String(s)), 'application/xml')
+  };
+})();
+function mount(el, content) { el.innerHTML = TT.html(content); segAria(el); return el; }
+
+/* Tombol pilihan (.seg) yang bukan tab: status terpilih juga diumumkan (aria-pressed), bukan hanya warna. */
+function segAria(root) {
+  $$('.seg:not([role=tablist]):not(nav) > button', root).forEach(b => b.setAttribute('aria-pressed', b.classList.contains('on') ? 'true' : 'false'));
+}
+document.addEventListener('click', e => { const g = e.target.closest && e.target.closest('.seg'); if (g) queueMicrotask(() => segAria(g.parentNode || g)); });
+
+/* ---------- Tab di dalam halaman (modern-web-guidance: ui-components/tabs) ----------
+   tablist/tab/tabpanel + aria-selected; satu tab stop, panah kiri/kanan/Home/End memindah fokus,
+   Enter/Spasi memilih (aktivasi manual karena isi tab dimuat dari server).
+   Memakai focusgroup bawaan bila browser mendukung; selain itu roving tabindex sederhana. */
+const Tab = (() => {
+  let fokusBerikut = null;
+  const asli = 'focusgroup' in HTMLElement.prototype;
+  function atur(daftar, nilai) {
+    const tbs = $$('[role=tab]', daftar);
+    tbs.forEach(b => {
+      const on = b.dataset.v === nilai;
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      if (!asli) b.tabIndex = on ? 0 : -1;
+    });
+    const p = document.getElementById(daftar.dataset.panel), pilih = tbs.find(b => b.dataset.v === nilai);
+    if (p && pilih) p.setAttribute('aria-labelledby', pilih.id);
+  }
+  /** daftar: wadah tombol [data-v]; panel: elemen isi; nilai: tab terpilih; kunci: id unik per halaman. */
+  function pasang(daftar, panel, nilai, { kunci = 'tab', label = '' } = {}) {
+    if (!daftar || !panel) return;
+    const id = 'tab-' + kunci;
+    daftar.setAttribute('role', 'tablist');
+    if (label) daftar.setAttribute('aria-label', label);
+    if (asli) daftar.setAttribute('focusgroup', 'tablist');
+    panel.id = id + '-p'; panel.setAttribute('role', 'tabpanel');
+    daftar.dataset.panel = panel.id;
+    $$('button[data-v]', daftar).forEach(b => {
+      b.type = 'button'; b.setAttribute('role', 'tab'); b.removeAttribute('aria-pressed'); b.id = id + '-' + b.dataset.v; b.setAttribute('aria-controls', panel.id);
+    });
+    atur(daftar, nilai);
+    // fase capture: berjalan SEBELUM penangan klik halaman (yang mungkin langsung merender ulang)
+    daftar.addEventListener('click', e => {
+      const b = e.target.closest('[role=tab]'); if (!b) return;
+      atur(daftar, b.dataset.v); fokusBerikut = id;   // bila halaman dirender ulang, fokus kembali ke tab ini
+    }, true);
+    if (!asli) {
+      daftar.addEventListener('keydown', e => {
+        const tbs = $$('[role=tab]', daftar), i = tbs.indexOf(e.target.closest('[role=tab]'));
+        if (i < 0) return;
+        const j = { ArrowRight: (i + 1) % tbs.length, ArrowLeft: (i - 1 + tbs.length) % tbs.length, Home: 0, End: tbs.length - 1 }[e.key];
+        if (j === undefined) return;
+        e.preventDefault();
+        tbs.forEach((b, k) => { b.tabIndex = k === j ? 0 : -1; });
+        tbs[j].focus();
+      });
+      daftar.addEventListener('focusout', e => {
+        if (!daftar.contains(e.relatedTarget)) { const s = $('[role=tab][aria-selected=true]', daftar); if (s) atur(daftar, s.dataset.v); }
+      });
+    }
+    if (fokusBerikut === id) { fokusBerikut = null; const s = $('[role=tab][aria-selected=true]', daftar); if (s) s.focus({ preventScroll: true }); }
+  }
+  return { pasang };
+})();
 
 const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 function tglID(s) {
@@ -102,7 +191,7 @@ function keluar(pesan) {
   LS.del('rk:sesi');
   if (uid) LS.del('rk:boot:' + uid);
   Object.keys(localStorage).filter(k => k.startsWith('rk:c:')).forEach(k => LS.del(k));
-  document.body.classList.remove('nav-open');
+  Laci.tutup(false);
   location.hash = '#/masuk';
   if (pesan) setTimeout(() => toast(pesan, 'warn'), 50);
 }
@@ -337,90 +426,195 @@ const Simpan = (() => {
 })();
 
 /* ---------- Toast ---------- */
-function toast(msg, type = 'info', judul = '') {
-  // Saat modal terbuka, halaman di belakangnya inert & tertutup lapisan atas:
-  // tampilkan pesan di dalam modal agar terlihat dan dibacakan pembaca layar.
-  const dlg = $$('dialog.modal').filter(d => d.open).pop();
-  if (dlg) return pesanModal(dlg, msg, type, judul);
+/* ---------- Pengumuman pembaca layar & toast (modern-web-guidance: toast notifications, accessible errors) ---------- */
+/** Satu wilayah live untuk seluruh halaman (sudah ada di index.html sejak awal); ariaNotify bila tersedia. */
+const umumkan = (() => {
+  let t = null;
+  return teks => {
+    if (!teks) return;
+    if (typeof document.ariaNotify === 'function') { try { document.ariaNotify(teks); return; } catch (e) { /* lanjut ke live region */ } }
+    const el = document.getElementById('pengumuman');
+    if (!el) return;
+    clearTimeout(t); el.textContent = '';
+    t = setTimeout(() => { el.textContent = teks; }, 120);
+  };
+})();
+const IKON_TOAST = { ok: 'check_circle', err: 'error', warn: 'warning', info: 'info' };
+function wadahToast() {
   let box = $('.toasts');
-  if (!box) { box = document.createElement('div'); box.className = 'toasts'; box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box); }
-  const ikon = { ok: 'check_circle', err: 'error', warn: 'warning', info: 'info' }[type] || 'info';
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'toasts';
+    box.setAttribute('role', 'region');
+    box.setAttribute('aria-label', 'Notifikasi');
+    if (Object.hasOwn(HTMLElement.prototype, 'popover')) box.setAttribute('popover', 'manual');   // lapisan teratas, tidak tertutup elemen lain
+    document.body.appendChild(box);
+  }
+  if (box.hasAttribute('popover')) {
+    try { if (box.matches(':popover-open')) box.hidePopover(); box.showPopover(); } catch (e) { /* abaikan */ }
+  }
+  return box;
+}
+function toast(msg, type = 'info', judul = '') {
+  const ikon = IKON_TOAST[type] || 'info';
+  // Saat jendela modal terbuka, isi di luar modal tidak bisa dijangkau → tampilkan pesan DI DALAM modal.
+  const dlg = [...document.querySelectorAll('dialog.modal[open]')].pop();
+  const area = dlg && $('.modal-pesan', dlg);
+  if (area) {
+    mount(area, html`<div class="alert ${type === 'ok' ? 'ok' : type === 'err' ? 'err' : type === 'warn' ? 'warn' : ''}">${ic(ikon)}<div>${judul ? html`<b>${judul}</b> ` : ''}${msg}</div></div>`);
+    dlg._antre = { a: [msg, type, judul], t: Date.now() };   // bila dialog segera ditutup, pesan dipindah ke toast biasa
+    return;
+  }
+  const box = wadahToast();
   const el = document.createElement('div');
   el.className = 'toast ' + type;
-  mount(el, html`${ic(ikon)}<div>${judul ? html`<b>${judul}</b>` : ''}${msg}</div>`);
+  mount(el, html`${ic(ikon)}<div class="grow">${judul ? html`<b>${judul}</b>` : ''}${msg}</div>
+    <button type="button" class="toast-x" aria-label="Tutup notifikasi">${ic('close', 'sm')}</button>`);
   box.appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, type === 'err' ? 6000 : 3500);
+  while (box.children.length > 4) box.firstElementChild.remove();
+  umumkan((judul ? judul + '. ' : '') + msg);
+  // galat & peringatan menetap sampai ditutup; info/ok hilang sendiri, jeda saat disorot/difokus
+  const hapus = () => {
+    const fokusDiSini = el.contains(document.activeElement);
+    el.remove();
+    if (fokusDiSini) { const lain = $('.toast-x', box); if (lain) lain.focus(); else { const v = $('#view'); if (v) v.focus({ preventScroll: true }); } }
+    if (!box.children.length && box.hasAttribute('popover')) { try { box.hidePopover(); } catch (e) { /* abaikan */ } }
+  };
+  $('.toast-x', el).onclick = hapus;
+  if (type === 'ok' || type === 'info') {
+    let sisa = 4000, mulai = Date.now(), timer = setTimeout(hapus, sisa);
+    const jeda = () => { clearTimeout(timer); sisa -= Date.now() - mulai; };
+    const lanjut = () => { if (el.matches(':hover') || el.contains(document.activeElement)) return; mulai = Date.now(); timer = setTimeout(hapus, Math.max(1500, sisa)); };
+    el.addEventListener('mouseenter', jeda); el.addEventListener('focusin', jeda);
+    el.addEventListener('mouseleave', lanjut); el.addEventListener('focusout', () => setTimeout(lanjut, 0));
+  }
 }
 
-/* ---------- Modal (native <dialog> + showModal) ----------
-   Browser yang mengurus: halaman di belakang inert, fokus terkurung di dalam
-   modal, Esc / gestur kembali di HP menutup modal, fokus kembali ke tombol pemicu. */
-let modalSeq = 0;
-const LIGHT_DISMISS = 'closedBy' in HTMLDialogElement.prototype;
-function pesanModal(dlg, msg, type = 'info', judul = '') {
-  const box = $('.modal-msg', dlg);
-  const ikon = { ok: 'check_circle', err: 'error', warn: 'warning', info: 'info' }[type] || 'info';
-  mount(box, html`<div class="alert ${type === 'info' ? '' : type}" role="${type === 'err' ? 'alert' : 'status'}">${ic(ikon)}<div>${judul ? html`<b>${judul}</b> ` : ''}${msg}</div></div>`);
-  clearTimeout(box._t);
-  if (type !== 'err') box._t = setTimeout(() => { box.textContent = ''; }, 3500);
-}
-function modal({ judul, isi, aksi = [], lebar = '', onBuka }) {
+/* ---------- Laci menu di HP (modern-web-guidance: navigation drawer, varian laci+sidebar) ----------
+   Di layar lebar menu adalah sidebar biasa. Di HP menu menjadi laci: saat terbuka berperan sebagai dialog modal
+   (aria-modal, isi lain inert, Esc menutup, fokus masuk ke laci lalu kembali ke tombol pembuka). */
+const Laci = (() => {
+  const mq = matchMedia('(max-width: 64em)');
+  let pemicu = null;
+  const luar = () => [$('.topbar'), $('#view'), $('.bottomnav')].filter(Boolean);
+  const terbuka = () => document.body.classList.contains('nav-open');
+  function buka(dari) {
+    const side = $('.side');
+    if (!side || !mq.matches) return;
+    pemicu = dari || $('[data-hamb]');
+    document.body.classList.add('nav-open');
+    side.setAttribute('role', 'dialog'); side.setAttribute('aria-modal', 'true');
+    luar().forEach(el => { el.inert = true; });
+    $$('[data-hamb], .bottomnav [data-menu]').forEach(b => b.setAttribute('aria-expanded', 'true'));
+    const f = $('.side a.nav.on') || $('.side [data-tutup-nav]');
+    requestAnimationFrame(() => { if (f) f.focus(); });
+  }
+  function tutup(kembali = true) {
+    const ada = terbuka(), side = $('.side');
+    document.body.classList.remove('nav-open');
+    if (side) { side.removeAttribute('role'); side.removeAttribute('aria-modal'); }
+    luar().forEach(el => { el.inert = false; });
+    $$('[data-hamb], .bottomnav [data-menu]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    if (ada && kembali && pemicu && pemicu.isConnected) pemicu.focus();
+    pemicu = null;
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && terbuka() && !document.querySelector('dialog[open]')) { e.preventDefault(); tutup(); }
+  });
+  mq.addEventListener('change', () => { if (!mq.matches) tutup(false); });
+  return { buka, tutup, terbuka, alih: dari => (terbuka() ? tutup() : buka(dari)) };
+})();
+
+/* ---------- Modal: <dialog> bawaan browser (modern-web-guidance: ui-components/dialog) ----------
+   showModal() memberi lapisan teratas, halaman di belakang tidak bisa disentuh (inert), fokus terkunci
+   di dalam dialog, Esc/gestur kembali menutup, dan fokus kembali ke tombol pembuka secara otomatis. */
+let _nModal = 0;
+function modal({ judul, isi, aksi = [], lebar = '', onBuka, tutupLuar, fokusAman = false }) {
   return new Promise(resolve => {
-    const id = 'mdl-' + (++modalSeq) + '-t';
+    const id = 'mdl-' + (++_nModal);
     const dlg = document.createElement('dialog');
     dlg.className = ('modal ' + lebar).trim();
-    dlg.setAttribute('aria-labelledby', id);
-    dlg.setAttribute('closedby', 'any'); // Esc + klik di luar (Safari: lihat fallback di bawah)
+    dlg.setAttribute('aria-labelledby', id + '-j');
     const tombol = aksi.map((a, i) => html`<button class="btn ${a.kelas || ''}" data-i="${i}" type="button">${a.ikon ? ic(a.ikon, 'sm') : ''}${a.label}</button>`);
-    mount(dlg, html`<div class="modal-h"><h3 id="${id}">${judul}</h3><button class="btn icon sm ghost" data-x type="button" aria-label="Tutup">${ic('close', 'sm')}</button></div>
-      <div class="modal-b">${isi}</div>
-      <div class="modal-msg" aria-live="polite"></div>
+    mount(dlg, html`<div class="modal-h"><h2 class="modal-j" id="${id}-j">${judul}</h2><button class="btn icon sm ghost" type="button" data-x aria-label="Tutup">${ic('close', 'sm')}</button></div>
+      <div class="modal-b">${isi}<div class="modal-pesan" role="status"></div></div>
       ${aksi.length ? html`<div class="modal-f">${tombol}</div>` : ''}`);
     document.body.appendChild(dlg);
-
-    let hasil = null, sibuk = false;
-    const tutup = v => { hasil = v; dlg.close(); };
-    dlg.addEventListener('close', () => { dlg.remove(); resolve(hasil); }, { once: true });
-    // Esc / klik di luar / gestur kembali: tahan selama aksi sedang diproses
-    dlg.addEventListener('cancel', e => { if (sibuk) e.preventDefault(); });
-
+    let hasil = null, selesai = false;
+    const akhiri = () => {
+      if (selesai) return; selesai = true;
+      const q = dlg._antre; dlg.remove(); resolve(hasil);
+      // dialog selesai lewat tombol aksi (bukan dibatalkan) → pesan terakhir dipindah ke toast agar tetap terbaca
+      if (q && hasil !== null && Date.now() - q.t < 2500) setTimeout(() => toast(...q.a), 0);
+    };
+    const tutup = v => { hasil = v; if (dlg.open) dlg.close(); else akhiri(); };
+    dlg.addEventListener('close', akhiri);
+    // Tutup dengan ketuk di luar kotak hanya untuk dialog TANPA isian (isian tidak hilang karena salah ketuk).
+    const adaIsian = !!dlg.querySelector('.modal-b input:not([type=hidden]), .modal-b select, .modal-b textarea');
+    if (tutupLuar === undefined ? !adaIsian : tutupLuar) {
+      if ('closedBy' in HTMLDialogElement.prototype) dlg.setAttribute('closedby', 'any');
+      else {   // cadangan: tekan & lepas di luar kotak dialog
+        const diLuar = e => { const r = dlg.getBoundingClientRect(); return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom; };
+        let turun = false;
+        dlg.addEventListener('pointerdown', e => { turun = e.target === dlg && diLuar(e); });
+        dlg.addEventListener('pointerup', e => { if (turun && e.target === dlg && diLuar(e)) tutup(null); turun = false; });
+      }
+    }
     dlg.addEventListener('click', async e => {
       if (e.target.closest('[data-x]')) return tutup(null);
       const b = e.target.closest('[data-i]');
-      if (!b || sibuk) return;
+      if (!b) return;
       const a = aksi[+b.dataset.i];
-      if (!a.onClick) return tutup(a.nilai === undefined ? true : a.nilai);
-      sibuk = true; b.classList.add('busy');
-      $('.modal-msg', dlg).textContent = '';
-      try { const v = await a.onClick(dlg); if (v !== false) tutup(v === undefined ? a.nilai : v); }
-      catch (err) { pesanModal(dlg, err.message, 'err'); }
-      finally { sibuk = false; b.classList.remove('busy'); }
+      if (a.onClick) {
+        b.classList.add('busy');
+        try { const v = await a.onClick(dlg); if (v !== false) tutup(v === undefined ? a.nilai : v); }
+        catch (err) { toast(err.message, 'err'); }
+        finally { b.classList.remove('busy'); }
+      } else tutup(a.nilai === undefined ? true : a.nilai);
     });
-
-    if (!LIGHT_DISMISS) {
-      // Fallback closedby="any": cek posisi pointer (bukan e.target, karena padding
-      // dialog juga ber-target <dialog>); tekan & lepas harus sama-sama di luar.
-      const luar = e => { const r = dlg.getBoundingClientRect(); return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom; };
-      let tekanLuar = false;
-      dlg.addEventListener('pointerdown', e => { tekanLuar = luar(e); });
-      dlg.addEventListener('pointerup', e => { if (tekanLuar && luar(e) && !sibuk) tutup(null); });
-    }
-
-    // Fokus awal: kolom isian pertama; konfirmasi berbahaya → tombol aman (Batal);
-    // selain itu tombol aksi utama (terakhir).
-    const isian = $('input:not([type=hidden]):not(:disabled),select:not(:disabled),textarea:not(:disabled)', dlg);
-    const btn = $$('.modal-f [data-i]', dlg);
-    const bahaya = aksi.some(a => /danger/.test(a.kelas || ''));
-    const awal = isian && isian.type === 'radio' ? ($(`input[type=radio][name="${isian.name}"]:checked`, dlg) || isian)
-      : isian || (bahaya ? btn.find((_, i) => /ghost/.test(aksi[i].kelas || '')) : btn[btn.length - 1]);
-    if (awal) awal.autofocus = true;
-
-    if (onBuka) onBuka(dlg);
+    // Fokus awal: isian pertama; untuk konfirmasi berbahaya → tombol aman (Batal); selain itu tombol utama.
+    const isian = [...dlg.querySelectorAll('.modal-b input:not([type=hidden]):not([disabled]), .modal-b select:not([disabled]), .modal-b textarea:not([disabled])')]
+      .find(el => !el.closest('[hidden]'));
+    const tb = $$('.modal-f [data-i]', dlg);
+    const awal = dlg.querySelector('.modal-b [autofocus]') || isian || (fokusAman ? tb[0] : tb[tb.length - 1]) || $('[data-x]', dlg);
+    if (awal) awal.setAttribute('autofocus', '');
     dlg.showModal();
+    if (onBuka) onBuka(dlg);
   });
 }
 function konfirmasi(judul, pesan, label = 'Ya, lanjutkan', kelas = 'primary') {
-  return modal({ judul, isi: html`<p>${pesan}</p>`, aksi: [{ label: 'Batal', kelas: 'ghost', nilai: false }, { label, kelas, nilai: true }] });
+  return modal({ judul, isi: html`<p>${pesan}</p>`, fokusAman: kelas === 'danger',
+    aksi: [{ label: 'Batal', kelas: 'ghost', nilai: false }, { label, kelas, nilai: true }] });
+}
+/** Galat formulir yang dapat diakses (modern-web-guidance: accessible form errors):
+    isian salah ditandai aria-invalid + aria-describedby ke pesan, fokus pindah ke isian salah pertama
+    (pembaca layar membacakan pesannya). Tanpa isian → pesan diumumkan lewat wilayah live. */
+function galatForm(f, pesan, salah = []) {
+  const err = $('[data-err]', f);
+  if (!err.id) err.id = 'err-' + Math.random().toString(36).slice(2, 8);
+  err.textContent = pesan || '';
+  $$('[aria-invalid="true"]', f).forEach(i => {
+    i.setAttribute('aria-invalid', 'false');
+    const d = (i.getAttribute('aria-describedby') || '').split(/\s+/).filter(x => x && x !== err.id);
+    if (d.length) i.setAttribute('aria-describedby', d.join(' ')); else i.removeAttribute('aria-describedby');
+  });
+  if (!pesan) return;
+  salah.filter(Boolean).forEach(i => {
+    i.setAttribute('aria-invalid', 'true');
+    const d = (i.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+    if (!d.includes(err.id)) i.setAttribute('aria-describedby', d.concat(err.id).join(' '));
+  });
+  if (salah[0]) salah[0].focus(); else umumkan(pesan);
+}
+/** Tombol tampilkan/sembunyikan sandi: label & status ikut berubah. */
+function ikatLihatSandi(btn, input) {
+  btn.setAttribute('aria-pressed', 'false');
+  btn.onclick = () => {
+    const tampil = input.type === 'password';
+    input.type = tampil ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', tampil ? 'true' : 'false');
+    const i = $('.ic', btn); if (i) i.textContent = tampil ? 'visibility_off' : 'visibility';
+  };
 }
 function nilaiForm(root) {
   const o = {};
@@ -473,7 +667,8 @@ async function render() {
   if (def.auth === 'staf' && (!S.token || S.isOrtu)) return go('/masuk');
   if (def.auth === 'ortu' && (!S.token || !S.isOrtu)) return go('/ortu');
   if (def.peran && !def.peran.some(p => S.peran(p))) { toast('Menu ini bukan untuk peran Anda.', 'warn'); return go('/beranda'); }
-  document.body.classList.remove('nav-open');
+  const dariLaci = Laci.terbuka();
+  Laci.tutup(false);
   document.title = (def.judul ? def.judul + ' · ' : '') + 'RaporKilat SD';
   R.cur = def;
   let view;
@@ -482,11 +677,14 @@ async function render() {
   // elemen tampilan baru tiap render → listener halaman lama tidak ikut terbawa
   const segar = view.cloneNode(false); view.replaceWith(segar); view = segar;
   window.scrollTo(0, 0);
+  if (dariLaci) view.focus({ preventScroll: true });   // pindah halaman dari laci → fokus ke konten baru
   try { await def.render(view, Object.assign(params, { q, alive })); }
   catch (e) {
     if (!alive()) return;
     console.error(e);
-    mount(view, kosong('cloud_off', 'Gagal memuat halaman', e.message, html`<button class="btn primary" onclick="render()">${ic('refresh', 'sm')}Coba lagi</button>`));
+    // tanpa onclick="" di HTML: CSP (script-src 'self') memblokir penangan event inline
+    mount(view, kosong('cloud_off', 'Gagal memuat halaman', e.message, html`<button class="btn primary" type="button" data-coba>${ic('refresh', 'sm')}Coba lagi</button>`));
+    const b = $('[data-coba]', view); if (b) b.onclick = () => render();
   }
 }
 window.addEventListener('hashchange', render);
@@ -551,13 +749,19 @@ const B = {
 };
 
 /* ---------- Kerangka (topbar + sidebar) ---------- */
+/** Kepala sekolah yang tidak mengajar & bukan wali kelas: hanya memantau (P3.6). */
+function hanyaPantau() { return !!S.user && S.peran('kepsek') && !S.peran('guru') && !S.peran('operator') && !(S.boot && B.isWali()); }
+
 const Shell = (() => {
   let ada = false, lepasSimpan = null;
   function menuDef() {
     const m = [];
     m.push({ grp: 'Utama', items: [['/beranda', 'dashboard', 'Ringkasan & Progres']] });
     const punyaMr = S.boot && B.mrSaya().length;
-    if (punyaMr || S.peran('guru')) m.push({ grp: 'Penilaian Merdeka', items: [
+    // P3.6: kepala sekolah (tanpa tugas mengajar) cukup memantau — menu baca saja, tanpa menu input
+    if (hanyaPantau()) m.push({ grp: 'Pantau Nilai', items: [
+      ['/nilai', 'grid_on', 'Nilai TP & LM (lihat)'], ['/sumatif', 'fact_check', 'Sumatif & NA (lihat)'], ['/deskripsi', 'description', 'Capaian & Deskripsi (lihat)']] });
+    else if (punyaMr || S.peran('guru')) m.push({ grp: 'Penilaian Merdeka', items: [
       ['/tp', 'checklist', 'Lingkup Materi & TP'], ['/nilai', 'grid_on', 'Grid Nilai TP & LM'],
       ['/sumatif', 'fact_check', 'Nilai Sumatif (STS/SAS)'], ['/deskripsi', 'description', 'Capaian & Deskripsi']] });
     if (S.boot && (B.isWali() || S.peran('operator'))) m.push({ grp: 'Wali Kelas', items: [
@@ -576,25 +780,36 @@ const Shell = (() => {
     if (S.peran('operator') || S.peran('kepsek')) m[m.length - 1].items.push(['/audit', 'history', 'Audit Log']);
     return m;
   }
+  /** P3.9: 4 menu tersering per peran untuk navigasi bawah di HP (+ tombol "Menu" untuk sisanya). */
+  function menuBawah() {
+    if (S.peran('operator')) return [['/beranda', 'dashboard', 'Beranda'], ['/siswa', 'school', 'Siswa'], ['/rombel', 'meeting_room', 'Rombel'], ['/kunci', 'lock_clock', 'Kunci']];
+    if (hanyaPantau()) return [['/beranda', 'dashboard', 'Beranda'], ['/persetujuan', 'verified', 'Setujui'], ['/monitoring', 'monitoring', 'Pantau'], ['/nilai', 'grid_on', 'Nilai']];
+    const wali = S.boot && B.isWali();
+    return wali ? [['/beranda', 'dashboard', 'Beranda'], ['/nilai', 'grid_on', 'Nilai'], ['/kelas', 'groups', 'Kelas'], ['/rapor', 'assignment_turned_in', 'Rapor']]
+      : [['/beranda', 'dashboard', 'Beranda'], ['/tp', 'checklist', 'TP'], ['/nilai', 'grid_on', 'Nilai'], ['/sumatif', 'fact_check', 'Sumatif']];
+  }
   function pastikan() {
     if (!ada) {
       mount($('#app'), html`
         <header class="topbar">
-          <button class="hamb" aria-label="Buka menu" data-hamb>${ic('menu')}</button>
+          <button class="hamb" type="button" aria-label="Buka menu" aria-expanded="false" aria-controls="menu-utama" data-hamb>${ic('menu')}</button>
           <a class="brand" href="#/beranda"><span class="logo">${ic('auto_stories')}</span><span class="hide-m">RaporKilat SD</span></a>
           <button class="ctx" data-ctx title="Ganti tahun ajaran/semester">${ic('apartment', 'sm')}<span><b data-ctx-sek></b><small data-ctx-per></small></span>${ic('unfold_more', 'sm')}</button>
           <span class="sp"></span>
           <span class="savechip" data-save title="Status simpan otomatis"><span class="dot"></span><span class="lbl-t" data-save-t>Siap</span></span>
           <button class="userbtn" data-user aria-label="Menu akun"><span class="u-txt"><div class="u-n" data-u-n></div><div class="u-r" data-u-r></div></span><span class="av" data-u-av></span></button>
         </header>
-        <aside class="side" aria-label="Menu utama"></aside>
+        <aside class="side" id="menu-utama" aria-label="Menu utama"></aside>
         <div class="scrim" data-scrim></div>
-        <main class="main" id="view" tabindex="-1"></main>`);
+        <main class="main" id="view" tabindex="-1"></main>
+        <nav class="bottomnav" aria-label="Navigasi cepat"></nav>`);
       ada = true;
-      $('[data-hamb]').onclick = () => document.body.classList.toggle('nav-open');
-      $('[data-scrim]').onclick = () => document.body.classList.remove('nav-open');
+      $('[data-hamb]').onclick = e => Laci.alih(e.currentTarget);
+      $('[data-scrim]').onclick = () => Laci.tutup();
+      $('.side').addEventListener('click', e => { if (e.target.closest('[data-tutup-nav]')) Laci.tutup(); });
       $('[data-ctx]').onclick = pilihPeriode;
       $('[data-user]').onclick = menuAkun;
+      $('.bottomnav').onclick = e => { const b = e.target.closest('[data-menu]'); if (b) Laci.alih(b); };
       lepasSimpan = Simpan.on(chipSimpan);
       chipSimpan(Simpan.info());
       menu(); konteks();
@@ -609,15 +824,38 @@ const Shell = (() => {
     if (!side || !S.boot) return;
     const def = menuDef();
     const p = B.periode();
-    mount(side, html`${def.map(g => html`<div class="grp">${g.grp}</div>${g.items.map(([href, ikon, label, cnt]) =>
-      html`<a class="nav" href="#${href}" data-nav="${href}">${ic(ikon)}<span>${label}</span>${cnt ? html`<span class="cnt">${cnt}</span>` : ''}</a>`)}`)}
+    // P3.7: kelompok menu bisa dilipat; pilihan diingat per pengguna. Kelompok yang berisi halaman aktif selalu terbuka.
+    const tutup = menuTertutup(), kini = R.cur && (R.cur.menu || hashInfo().path);
+    mount(side, html`<div class="side-top"><b>Menu</b><button class="btn icon sm ghost" type="button" data-tutup-nav aria-label="Tutup menu">${ic('close', 'sm')}</button></div>
+      ${def.map(g => { const buka = g.grp === 'Utama' || !tutup.includes(g.grp) || g.items.some(it => it[0] === kini);
+      return html`<details class="grp-d" data-grp="${g.grp}" ${buka ? raw('open') : ''}><summary class="grp">${g.grp}${ic('expand_more', 'sm chev')}</summary>${g.items.map(([href, ikon, label, cnt]) =>
+      html`<a class="nav" href="#${href}" data-nav="${href}">${ic(ikon)}<span>${label}</span>${cnt ? html`<span class="cnt">${cnt}</span>` : ''}</a>`)}</details>`; })}
       <div class="foot"><div class="lbl">Periode aktif</div><div class="small bold mt-8">${B.periodeLabel(p)}</div>
       <div class="xs muted mt-8">v${APP_VERSI} · <a href="#/panduan">Panduan</a></div></div>`);
+    $$('details.grp-d', side).forEach(d => d.addEventListener('toggle', () => {
+      const t = menuTertutup().filter(x => x !== d.dataset.grp);
+      if (!d.open) t.push(d.dataset.grp);
+      LS.set('rk:menuTutup:' + S.user.id, t);
+    }));
+    const bn = $('.bottomnav');
+    if (bn) mount(bn, html`${menuBawah().map(([href, ikon, label]) => html`<a href="#${href}" data-nav="${href}">${ic(ikon)}<span>${label}</span></a>`)}
+      <button type="button" data-menu aria-label="Semua menu" aria-expanded="false" aria-controls="menu-utama">${ic('menu')}<span>Menu</span></button>`);
     aktif(R.cur && (R.cur.menu || hashInfo().path));
     // prefetch saat kursor mendekati menu (navigasi terasa instan)
     $$('a.nav', side).forEach(a => a.addEventListener('pointerenter', () => Prefetch.untuk(a.dataset.nav), { once: true }));
   }
-  function aktif(path) { $$('.side a.nav').forEach(a => a.classList.toggle('on', a.dataset.nav === path)); }
+  function aktif(path) {
+    $$('.side a.nav, .bottomnav a').forEach(a => { const on = a.dataset.nav === path; a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    document.body.classList.toggle('pantau', hanyaPantau());   // P3.6: sembunyikan tanda simpan untuk kepala sekolah
+    const on = $('.side a.nav.on'), d = on && on.closest('details');
+    if (d && !d.open) d.open = true;
+  }
+  function menuTertutup() {
+    const t = LS.get('rk:menuTutup:' + (S.user && S.user.id));
+    if (Array.isArray(t)) return t;
+    // bawaan: operator yang tidak mengajar/bukan wali → kelompok penilaian & wali kelas dilipat
+    return S.peran('operator') && !S.peran('guru') && !(S.boot && B.isWali()) ? ['Penilaian Merdeka', 'Wali Kelas'] : [];
+  }
   function konteks() {
     if (!ada || !S.boot) return;
     const set = (s, v) => { const e = $(s); if (e) e.textContent = v; };
@@ -653,18 +891,19 @@ const Shell = (() => {
       onBuka: bg => $$('[data-a]', bg).forEach(b => b.onclick = () => { bg.querySelector('[data-x]').click(); setTimeout(() => aksiAkun(b.dataset.a), 50); }) });
     return v;
   }
-  async function aksiAkun(a) {
+  async function aksiAkun(a, wajib) {
     if (a === 'keluar') { if (Simpan.info().pending && !await konfirmasi('Masih ada perubahan', 'Ada perubahan yang belum terkirim. Tetap keluar?', 'Keluar', 'danger')) return; keluar(); }
     if (a === 'segar') { Object.keys(localStorage).filter(k => k.startsWith('rk:c:')).forEach(k => LS.del(k)); await muatBoot(true); toast('Data diperbarui dari server.', 'ok'); render(); }
     if (a === 'sandi') {
       await modal({ judul: 'Ganti Kata Sandi', isi: html`<div class="col">
+        ${wajib ? html`<div class="alert warn">${ic('key')}<div>Anda masih memakai <b>sandi awal dari operator</b>. Ganti sekarang agar akun hanya bisa dibuka oleh Anda. Pesan ini muncul setiap masuk sampai sandi diganti.</div></div>` : ''}
         <div class="field"><label>Kata sandi lama</label><input class="input" type="password" name="lama" autocomplete="current-password"></div>
         <div class="field"><label>Kata sandi baru (min. 8 karakter)</label><input class="input" type="password" name="baru" autocomplete="new-password"></div></div>`,
-        aksi: [{ label: 'Batal', kelas: 'ghost' }, { label: 'Simpan', kelas: 'primary', onClick: async bg => {
+        aksi: [{ label: wajib ? 'Nanti saja' : 'Batal', kelas: 'ghost' }, { label: 'Simpan', kelas: 'primary', onClick: async bg => {
           const f = nilaiForm(bg); const r = await API.call('gantiSandi', f); simpanSesi(r.token, S.user); toast('Kata sandi diganti.', 'ok'); } }] });
     }
   }
-  return { pastikan, lepas, menu, aktif, konteks };
+  return { pastikan, lepas, menu, aktif, konteks, gantiSandi: wajib => aksiAkun('sandi', wajib) };
 })();
 
 /* ---------- Prefetch data halaman saat menu disentuh ---------- */
@@ -692,7 +931,14 @@ function pilihanMr(daftar, terpilih) {
 function mrAktif() {
   const daftar = B.mrSaya();
   let id = S.ctx.mr;
-  if (!daftar.some(m => m.id === id)) { id = daftar[0] && daftar[0].id; S.ctx.mr = id; S.simpanCtx(); }
+  // P3.5: wali kelas boleh MELIHAT mapel guru lain di kelasnya (dibuka dari daftar kekurangan leger)
+  const m0 = id && !daftar.some(m => m.id === id) ? B.mr(id) : null;
+  if (m0 && m0.id && B.rombel(m0.rombel_id).wali_id === S.user.id) return { daftar: daftar.concat([m0]), mr: m0 };
+  if (!daftar.some(m => m.id === id)) {
+    // P3.1: pilihan awal = mapel non-agama pertama (mapel agama sering belum diisi); pilihan berikutnya diingat
+    const utama = daftar.find(m => B.mapel(m.mapel_id).kelompok !== 'agama') || daftar[0];
+    id = utama && utama.id; S.ctx.mr = id; S.simpanCtx();
+  }
   return { daftar, mr: id ? B.mr(id) : null };
 }
 function rombelAktif() {
@@ -715,7 +961,7 @@ const Lazy = (() => {
     if (cache[src]) return cache[src];
     cache[src] = new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = src; s.onload = () => res(); s.onerror = () => { delete cache[src]; rej(new Error('Gagal memuat ' + src)); };
+      s.src = TT.url(src); s.onload = () => res(); s.onerror = () => { delete cache[src]; rej(new Error('Gagal memuat ' + src)); };
       document.head.appendChild(s);
     });
     return cache[src];

@@ -30,7 +30,11 @@ const BN = {
     list.forEach(ch => BN.ubah(bn, ch));
     BN.simpanCache(bn);
     Simpan.tambah(BN.kunciAntrian(bn.mr.id), 'simpanNilai', BN.arg(bn.mr.id), changes, {
-      onSaved: r => { bn.updated_at = r.updated_at; BN.simpanCache(bn); if (onSaved) onSaved(r); },
+      onSaved: r => {
+        bn.updated_at = r.updated_at; bn.updated_by = S.user.nama; BN.simpanCache(bn);
+        const t = $('[data-terakhir]'); if (t) mount(t, infoTerakhir(bn));   // P3.10
+        if (onSaved) onSaved(r);
+      },
       onError: () => { API.invalidate('bukuNilai'); render(); }
     });
   }
@@ -44,11 +48,29 @@ function barisKunci(bn) {
   return '';
 }
 
+/** P3.2: satu alur kerja per mapel — pindah TP → Nilai → Sumatif → Deskripsi tanpa ganti menu (mapel terpilih ikut). */
+function tabMapel(kini) {
+  const t = [['/tp', '1', 'TP', 'TP'], ['/nilai', '2', 'Nilai TP/LM', 'Nilai'], ['/sumatif', '3', 'Sumatif & NA', 'Sumatif'], ['/deskripsi', '4', 'Deskripsi', 'Deskripsi']]
+    .filter(x => !(hanyaPantau() && x[0] === '/tp'));
+  return html`<nav class="seg tab-mapel" aria-label="Alur kerja mapel">${t.map(([h, n, l, pendek]) =>
+    html`<a href="#${h}" class="${h === kini ? 'on' : ''}" ${h === kini ? raw('aria-current="page"') : ''}><span class="n">${n}</span><span class="t-l">${l}</span><span class="t-s">${pendek}</span></a>`)}</nav>`;
+}
+/** P3.10: siapa & kapan buku nilai terakhir disimpan; tandai bila bukan oleh pengguna ini. */
+function infoTerakhir(bn) {
+  if (!bn || !bn.updated_at) return html`<span class="xs muted">Belum pernah disimpan</span>`;
+  const d = new Date(bn.updated_at), hariIni = new Date().toDateString() === d.toDateString();
+  const kapan = (hariIni ? 'hari ini ' : tglID(String(bn.updated_at).slice(0, 10)) + ' ') + jamID(bn.updated_at);
+  const oleh = bn.updated_by || '';
+  const orangLain = oleh && oleh !== S.user.nama;
+  return orangLain
+    ? html`<span class="badge warn" title="Disimpan oleh ${oleh}">${ic('edit_note', 'sm')}Diubah ${oleh} · ${kapan}</span>`
+    : html`<span class="small muted">Disimpan ${kapan}${oleh ? ' · ' + oleh : ''}</span>`;
+}
 function ctxMapel(daftar, mr, extra = '') {
   return html`<div class="card ctxbar">
-    <div class="field" style="min-width:260px"><label for="pilih-mr">Kelas & mata pelajaran</label><select class="select" id="pilih-mr" data-pilih-mr>${pilihanMr(daftar, mr.id)}</select></div>
-    <div class="field"><label>Kelas / Fase</label><div class="row" style="min-height:36px"><span class="badge pri">${ic('groups', 'sm')}Kelas ${B.rombel(mr.rombel_id).nama} · Fase ${B.rombel(mr.rombel_id).fase}</span></div></div>
-    <div class="field"><label>KKTP</label><div class="row" style="min-height:36px"><span class="badge dark">${mr.kktp || 75}</span></div></div>
+    <div class="field utama"><label for="pilih-mr">Kelas & mata pelajaran</label><select class="select" id="pilih-mr" data-pilih-mr>${pilihanMr(daftar, mr.id)}</select></div>
+    <div class="field"><label>Kelas / Fase</label><div class="row isi"><span class="badge pri">${ic('groups', 'sm')}Kelas ${B.rombel(mr.rombel_id).nama} · Fase ${B.rombel(mr.rombel_id).fase}</span></div></div>
+    <div class="field"><label>KKTP</label><div class="row isi"><span class="badge dark">KKTP ${mr.kktp || 75}</span></div></div>
     <span class="grow"></span>${extra}</div>`;
 }
 function ikatPilihMr(view) {
@@ -129,7 +151,12 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-rb]');
   if (b) { S.ctx.rombel = b.dataset.rb; S.simpanCtx(); }
   const sc = e.target.closest('[data-scroll]');
-  if (sc) { e.preventDefault(); const t = document.getElementById(sc.dataset.scroll); if (t) t.scrollIntoView({ behavior: 'smooth' }); }
+  if (sc) {
+    e.preventDefault();
+    const id = sc.dataset.scroll, t = document.getElementById(id);
+    if (t) t.scrollIntoView({ behavior: 'smooth' });
+    else { go('/'); setTimeout(() => { const t2 = document.getElementById(id); if (t2) t2.scrollIntoView({ behavior: 'smooth' }); }, 400); }
+  }
 }, true);
 
 /* ============================================================
@@ -142,7 +169,7 @@ route('/tp', {
     if (!p.alive()) return;
     const { daftar, mr } = mrAktif();
     if (!mr) return tanpaMapel(view, 'Lingkup Materi & Tujuan Pembelajaran');
-    mount(view, html`${kepalaHalaman('Penilaian · Perencanaan', 'Lingkup Materi & Tujuan Pembelajaran', 'Teks TP dipakai langsung untuk menyusun deskripsi rapor. Tulis dengan kata kerja operasional, tanpa titik di akhir.')}
+    mount(view, html`${kepalaHalaman('Penilaian · Perencanaan', 'Lingkup Materi & Tujuan Pembelajaran', 'Teks TP dipakai langsung untuk menyusun deskripsi rapor. Tulis dengan kata kerja operasional, tanpa titik di akhir.', tabMapel('/tp'))}
       ${ctxMapel(daftar, mr)}<div data-isi>${skeleton(5)}</div>`);
     ikatPilihMr(view);
     let lm = null, kotor = false, bn = null;
@@ -243,7 +270,7 @@ function panelDeskripsi(bn, mr, row) {
   const kelas = Hitung.kelasPredikat(h.predikat);
   return html`<div class="card"><div class="card-h"><h3>${ic('auto_stories')}Inspeksi Deskripsi Rapor</h3><span class="badge ${h.manual ? 'warn' : 'ok'}">${h.manual ? 'Manual' : 'Otomatis'}</span></div>
     <div class="pad col gap-12">
-      <div class="row"><span class="av" style="width:36px;height:36px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px">${initials(row.nama)}</span>
+      <div class="row"><span class="av" style="width:36px;height:36px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:700;font-size:0.75rem">${initials(row.nama)}</span>
         <div class="grow"><b>${row.nama}</b><div class="xs muted">NISN ${row.nisn || '–'} · Absen ${row.no_absen}</div></div>
         <div class="right"><div class="score ${h.tuntas === false ? 'err' : kelas === 'ok' ? 'ok' : ''}">${h.na === null ? '–' : h.na}</div><div class="xs muted">Nilai akhir</div></div></div>
       ${h.tpMax ? html`<div class="card pad" style="box-shadow:none;background:var(--surface-2)"><div class="row between"><span class="lbl ok-t">${ic('arrow_circle_up', 'sm')} Capaian tertinggi (${h.tpMax.n})</span><span class="tag-tp">TP ${h.tpMax.kode}</span></div><p class="small mt-8"><i>${h.autoH}</i></p></div>` : html`<div class="alert">${ic('info')}<span>Isi nilai TP untuk menyusun deskripsi.</span></div>`}
@@ -279,8 +306,8 @@ route('/nilai', {
     if (!p.alive()) return;
     const { daftar, mr } = mrAktif();
     if (!mr) return tanpaMapel(view, 'Grid Nilai TP & LM');
-    mount(view, html`${kepalaHalaman('Penilaian · Formatif & sumatif lingkup materi', 'Grid Nilai TP & LM', '')}
-      ${ctxMapel(daftar, mr, html`<div class="field"><label>Progres input</label><div class="row" style="min-height:36px" data-prog><span class="skel" style="width:120px;height:8px"></span></div></div>`)}
+    mount(view, html`${kepalaHalaman('Penilaian · Formatif & sumatif lingkup materi', 'Grid Nilai TP & LM', '', tabMapel('/nilai'))}
+      ${ctxMapel(daftar, mr, html`<div class="field"><label>Progres input</label><div class="row isi" data-prog><span class="skel" style="width:120px;height:8px"></span></div></div><div class="field"><label>Terakhir disimpan</label><div class="row isi" data-terakhir></div></div>`)}
       <div data-isi>${skeleton(8)}</div>`);
     ikatPilihMr(view);
     let bn = null, grid = null, rowSel = null;
@@ -380,6 +407,7 @@ route('/nilai', {
       if (!p.alive()) return;
       const sama = bn && grid && JSON.stringify(bn.lm) === JSON.stringify(d.lm) && bn.siswa.length === d.siswa.length && bn.kunciSAS === d.kunciSAS;
       bn = d;
+      { const t = $('[data-terakhir]', view); if (t) mount(t, infoTerakhir(bn)); }
       if (sama) { grid.o.rows = bn.siswa; grid.refreshAll(); progres(); panel(); }
       else gambar();
     });
@@ -438,7 +466,7 @@ route('/sumatif', {
     if (!p.alive()) return;
     const { daftar, mr } = mrAktif();
     if (!mr) return tanpaMapel(view, 'Nilai Sumatif (STS/SAS)');
-    mount(view, html`${kepalaHalaman('Penilaian · Sumatif & nilai akhir', 'Nilai Sumatif (STS/SAS) & NA Mapel', '')}${ctxMapel(daftar, mr)}<div data-isi>${skeleton(8)}</div>`);
+    mount(view, html`${kepalaHalaman('Penilaian · Sumatif & nilai akhir', 'Nilai Sumatif (STS/SAS) & NA Mapel', '', tabMapel('/sumatif'))}${ctxMapel(daftar, mr, html`<div class="field"><label>Terakhir disimpan</label><div class="row isi" data-terakhir></div></div>`)}<div data-isi>${skeleton(8)}</div>`);
     ikatPilihMr(view);
     let bn = null, grid = null;
     const isi = () => $('[data-isi]', view);
@@ -456,7 +484,7 @@ route('/sumatif', {
       const tpLengkap = hs.filter(x => x.h.tpTerisi === x.h.tpTotal && x.h.tpTotal).length;
       const sasLengkap = hs.filter(x => x.h.sas !== null).length, stsLengkap = hs.filter(x => x.h.sts !== null).length;
       mount(sp, html`<div class="card"><div class="card-h"><h3>${ic('analytics')}Statistik kelas</h3><span class="xs muted">Rerata NA</span></div><div class="pad col gap-12">
-        <div class="row between"><div><div class="k-v pri-t" style="font-family:var(--f-head);font-size:30px;font-weight:700">${nas.length ? fmt1(nas.reduce((a, b) => a + b, 0) / nas.length) : '–'}</div><div class="xs muted">Rata-rata nilai akhir</div></div>
+        <div class="row between"><div><div class="k-v pri-t" style="font-family:var(--f-head);font-size:1.875rem;font-weight:700">${nas.length ? fmt1(nas.reduce((a, b) => a + b, 0) / nas.length) : '–'}</div><div class="xs muted">Rata-rata nilai akhir</div></div>
           <div class="right small">Tertinggi <b class="ok-t">${nas.length ? Math.max(...nas) : '–'}</b><br>Terendah <b class="err-t">${nas.length ? Math.min(...nas) : '–'}</b></div></div>
         <div><div class="row between small"><span>Ketuntasan KKTP (${kktp})</span><b class="ok-t">${nas.length ? Math.round(tuntas / nas.length * 100) : 0}%</b></div>
           <div class="bar mt-8"><i style="width:${nas.length ? tuntas / nas.length * 100 : 0}%;background:var(--ok)"></i><i style="width:${nas.length ? rem.length / nas.length * 100 : 0}%;background:var(--err);border-radius:0"></i></div>
@@ -477,7 +505,7 @@ route('/sumatif', {
           ${bn.bisaTulis && !bn.kunciSAS ? html`<button class="btn sm ghost" data-bobot>${ic('tune', 'sm')}Sesuaikan bobot & KKTP</button>` : ''}</div>
           <div class="grid3 mt-12" style="grid-template-columns:2fr 1fr 1fr 1fr">
             <div class="card pad" style="box-shadow:none;background:var(--surface-2)"><div class="lbl">Rumus NA</div><div class="mono small pri-t bold mt-8">NA = (Rerata TP × b_TP + Rerata LM × b_LM + SAS × b_AS) ÷ Σ bobot terisi</div></div>
-            ${[['bobot_tp', 'Bobot TP'], ['bobot_lm', 'Bobot LM'], ['bobot_as', 'Bobot SAS']].map(b => html`<div class="card pad center" style="box-shadow:none;background:var(--surface-2)"><div class="lbl">${b[1]}</div><div style="font-size:22px;font-weight:700" class="mt-8">${bn.mr[b[0]]}</div><div class="xs muted">${persen(b[0])}%</div></div>`)}</div>
+            ${[['bobot_tp', 'Bobot TP'], ['bobot_lm', 'Bobot LM'], ['bobot_as', 'Bobot SAS']].map(b => html`<div class="card pad center" style="box-shadow:none;background:var(--surface-2)"><div class="lbl">${b[1]}</div><div style="font-size:1.375rem;font-weight:700" class="mt-8">${bn.mr[b[0]]}</div><div class="xs muted">${persen(b[0])}%</div></div>`)}</div>
           <p class="xs muted mt-8">Komponen yang belum diisi tidak dihitung (bobotnya ikut diabaikan). Nilai STS dipakai untuk rapor tengah semester bersama rerata TP.</p></div>
         <div class="split mt-12"><div class="card" style="overflow:hidden"><div class="toolbar" style="border-bottom:1px solid var(--line)">
           <span class="badge info">${ic('keyboard', 'sm')}Tempel kolom STS/SAS langsung dari Excel</span><span class="grow"></span>
@@ -524,6 +552,7 @@ route('/sumatif', {
       if (!p.alive()) return;
       const sama = bn && grid && bn.siswa.length === d.siswa.length && bn.kunciSAS === d.kunciSAS && JSON.stringify(bn.mr) === JSON.stringify(d.mr);
       bn = d;
+      { const t = $('[data-terakhir]', view); if (t) mount(t, infoTerakhir(bn)); }
       if (sama) { grid.o.rows = bn.siswa; grid.refreshAll(); statistik(); } else gambar();
     });
   }
@@ -539,7 +568,7 @@ route('/deskripsi', {
     if (!p.alive()) return;
     const { daftar, mr } = mrAktif();
     if (!mr) return tanpaMapel(view, 'Capaian & Deskripsi');
-    mount(view, html`${kepalaHalaman('Penilaian · Deskripsi rapor', 'Capaian & Deskripsi', 'Kalimat disusun otomatis dari TP tertinggi & terendah. Ubah bila perlu — perubahan manual ditandai.')}
+    mount(view, html`${kepalaHalaman('Penilaian · Deskripsi rapor', 'Capaian & Deskripsi', 'Kalimat disusun otomatis dari TP tertinggi & terendah. Ubah bila perlu — perubahan manual ditandai.', tabMapel('/deskripsi'))}
       ${ctxMapel(daftar, mr, html`<div class="field"><label>Tampilkan</label><div class="seg" data-filter><button class="on" data-v="semua">Semua</button><button data-v="manual">Manual</button><button data-v="kurang">Belum lengkap</button></div></div>`)}
       <div data-isi>${skeleton(8)}</div>`);
     ikatPilihMr(view);
@@ -551,7 +580,7 @@ route('/deskripsi', {
       mount($('[data-isi]', view), html`${barisKunci(bn)}<div class="card mt-12"><div class="tbl-wrap"><table class="tbl">
         <thead><tr><th class="c">No</th><th>Nama</th><th class="c">NA</th><th>Predikat</th><th style="min-width:360px">Deskripsi capaian kompetensi</th><th></th></tr></thead>
         <tbody>${rows.map(({ r, h }) => html`<tr><td class="c muted">${r.no_absen}</td><td><b>${r.nama}</b><div class="xs muted">${r.nisn || ''}</div></td>
-          <td class="c"><span class="score ${h.tuntas === false ? 'err' : ''}" style="font-size:14px">${h.na === null ? '–' : h.na}</span></td>
+          <td class="c"><span class="score ${h.tuntas === false ? 'err' : ''}" style="font-size:0.875rem">${h.na === null ? '–' : h.na}</span></td>
           <td>${h.predikat ? html`<span class="badge ${Hitung.kelasPredikat(h.predikat)}">${h.predikat}</span>` : '–'}</td>
           <td class="small">${h.deskripsi || html`<span class="muted">Belum ada nilai TP.</span>`} ${h.manual ? html`<span class="badge warn">Manual</span>` : ''}</td>
           <td class="right" style="white-space:nowrap">${bisa ? html`<button class="btn sm ghost" data-ubah="${r.id}">${ic('edit', 'sm')}Ubah</button>${h.manual ? html`<button class="btn sm text" data-reset="${r.id}">Otomatis</button>` : ''}` : ''}</td></tr>`)}</tbody></table></div>

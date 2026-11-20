@@ -1,61 +1,106 @@
 /* ============================================================
-   RaporKilat SD — halaman publik: beranda, masuk, portal orang
-   tua (login), verifikasi QR, panduan singkat.
+   RaporKilat SD — halaman publik: portal sekolah, masuk, portal
+   orang tua (login), verifikasi QR, panduan & fitur.
    ============================================================ */
 'use strict';
 
 const DIMENSI8 = ['Keimanan & Ketakwaan', 'Kewargaan', 'Penalaran Kritis', 'Kreativitas', 'Kolaborasi', 'Kemandirian', 'Kesehatan', 'Komunikasi'];
 
+/* ---------- P2.1: identitas sekolah dari server (tampil seketika dari cache, diperbarui tiap 10 menit) ---------- */
+const Sekolah = {
+  dulu() { const c = API.cacheGet('infoSekolah', {}); return c ? c.d : null; },
+  /** Isi semua penanda [data-sk-*] di dalam `root` dengan identitas sekolah. */
+  pasang(root) {
+    const terapkan = i => { if (root.isConnected) terapkanSekolah(root, i); };
+    const c = Sekolah.dulu();
+    if (c) terapkan(c);
+    API.swr('infoSekolah', {}, terapkan, { ttl: 10 * 60e3 }).catch(() => { if (!c) terapkan(null); });
+  }
+};
+function logoSekolah(i, besar) {
+  return i && i.logo
+    ? html`<img class="logo-img${besar ? ' besar' : ''}" src="${i.logo}" alt="Logo ${i.nama}" referrerpolicy="no-referrer">`
+    : html`<span class="logo${besar ? ' besar' : ''}">${ic('auto_stories')}</span>`;
+}
+function waOperator(i, pesan) {
+  return i && i.wa ? 'https://wa.me/' + i.wa + '?text=' + encodeURIComponent(pesan.replace('{sekolah}', i.nama || 'sekolah')) : '';
+}
+function terapkanSekolah(root, i) {
+  const nama = (i && i.nama) || 'Rapor Digital Sekolah';
+  $$('[data-sk-brand]', root).forEach(el => { mount(el, html`${logoSekolah(i)}<span class="brand-t"><b>${nama}</b><small>Rapor Digital</small></span>`); el.setAttribute('aria-label', nama + ' — halaman depan'); });
+  $$('[data-sk-logo]', root).forEach(el => mount(el, logoSekolah(i, true)));
+  $$('[data-sk-nama]', root).forEach(el => { el.textContent = nama; });
+  $$('[data-sk-alamat]', root).forEach(el => { const t = i ? [i.alamat, i.kota].filter(Boolean).join(', ') : ''; el.textContent = t; el.hidden = !t; });
+  $$('[data-sk-ta]', root).forEach(el => { el.textContent = (i && i.ta) || ''; el.hidden = !(i && i.ta); });
+  // P2.6: lupa sandi/PIN → WhatsApp operator (bila nomor WA operator diisi di pengaturan)
+  $$('[data-sk-wa]', root).forEach(el => {
+    const url = waOperator(i, el.dataset.skWa);
+    mount(el, url
+      ? html`<a class="btn ghost sm" href="${url}" target="_blank" rel="noopener">${ic('chat', 'sm')}${el.dataset.label || 'Hubungi operator via WhatsApp'}</a>`
+      : html`<span>${'tanpa' in el.dataset ? el.dataset.tanpa : 'Hubungi operator sekolah.'}</span>`);
+  });
+}
+
 function navPublik() {
+  // P2.4 + P2.5: tombol Orang Tua berlabel di HP; tombol Fitur/Alur dihapus (bagiannya pindah ke Panduan)
   return html`<nav class="pub-nav"><div class="in">
-    <a class="brand" href="#/"><span class="logo">${ic('auto_stories')}</span>RaporKilat <span class="badge warn">SD</span></a>
+    <a class="brand" href="#/" data-sk-brand>${logoSekolah(Sekolah.dulu())}<span class="brand-t"><b>${(Sekolah.dulu() || {}).nama || 'Rapor Digital Sekolah'}</b><small>Rapor Digital</small></span></a>
     <span class="grow"></span>
-    <button class="btn text hide-m" data-scroll="fitur" type="button">Fitur</button><button class="btn text hide-m" data-scroll="alur" type="button">Alur</button>
-    <a class="btn ghost" href="#/ortu">${ic('family_restroom', 'sm')}<span class="hide-m">Portal Orang Tua</span></a>
+    <a class="btn ghost" href="#/ortu" aria-label="Portal Orang Tua">${ic('family_restroom', 'sm')}Orang Tua</a>
     <a class="btn primary" href="#/masuk">${ic('login', 'sm')}Masuk</a></div></nav>`;
 }
 
+/* ---------- P2.3: cek keaslian rapor dengan mengetik kode (tanpa scan QR) ---------- */
+function formCekKode(nilai = '') {
+  return html`<form class="row gap-8 cek-kode" data-cek novalidate>
+    <label class="sr-only" for="kode-rapor">Kode verifikasi rapor</label>
+    <input class="input mono" id="kode-rapor" name="kode" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Kode di bawah QR rapor" value="${nilai}">
+    <button class="btn primary" type="submit">${ic('search', 'sm')}Cek</button></form>`;
+}
+function ikatCekKode(root) {
+  $$('[data-cek]', root).forEach(f => {
+    f.onsubmit = e => {
+      e.preventDefault();
+      const k = f.kode.value.replace(/[^0-9a-z]/gi, '').toUpperCase();
+      if (k.length < 6) { toast('Ketik kode verifikasi yang tercetak di bawah QR rapor.', 'warn'); f.kode.focus(); return; }
+      go('/v/' + k);
+    };
+  });
+}
+
+/* ---------- P2.2: halaman depan = portal sekolah ---------- */
 route('/', {
-  judul: 'Rapor Digital SD Kurikulum Merdeka',
+  judul: 'Rapor Digital Sekolah',
   async render(view, p) {
     if (S.token && !S.isOrtu) return go('/beranda');
     if (S.token && S.isOrtu) return go('/portal');
+    const i = Sekolah.dulu();
     mount(view, html`<div class="pub">${navPublik()}
-      <section class="hero"><div class="kontainer">
-        <span class="pill">${ic('bolt', 'sm')}Rapor SD Kurikulum Merdeka · Kokurikuler 8 Dimensi</span>
-        <h1 class="mt-16">Satu data, semua guru mengisi bersama.<br><span>Rapor sekelas terbit sekali klik.</span></h1>
-        <p class="lead">Pengganti file rapor Excel makro: guru mapel dan wali kelas mengisi nilai bersamaan dari laptop atau HP, deskripsi capaian tersusun otomatis dari TP, kepala sekolah menyetujui, lalu rapor dicetak lengkap dengan QR verifikasi.</p>
-        <div class="row wrap gap-12"><a class="btn primary lg" href="#/masuk">${ic('login', 'sm')}Masuk Guru / Staf</a>
-          <a class="btn ghost lg" href="#/ortu">${ic('family_restroom', 'sm')}Portal Orang Tua</a></div>
-        <div class="row wrap gap-16 mt-16 small muted">
-          <span class="row gap-4">${ic('cloud_done', 'sm ok-t')}Simpan otomatis</span>
-          <span class="row gap-4">${ic('verified_user', 'sm ok-t')}Hak akses per peran</span>
-          <span class="row gap-4">${ic('print', 'sm ok-t')}Siap cetak A4 / F4</span>
-          <span class="row gap-4">${ic('install_mobile', 'sm ok-t')}Bisa dipasang di HP (PWA)</span></div>
+      <section class="portal-sk"><div class="kontainer">
+        <div class="id"><span data-sk-logo>${logoSekolah(i, true)}</span>
+          <div><span class="pill" data-sk-ta ${i && i.ta ? '' : raw('hidden')}>${(i && i.ta) || ''}</span>
+            <h1 class="mt-8" data-sk-nama>${(i && i.nama) || 'Rapor Digital Sekolah'}</h1>
+            <p class="muted mt-4" data-sk-alamat ${i && (i.alamat || i.kota) ? '' : raw('hidden')}>${i ? [i.alamat, i.kota].filter(Boolean).join(', ') : ''}</p></div></div>
+        <p class="lead">Layanan rapor digital Kurikulum Merdeka. Guru mengisi nilai dari laptop atau HP, kepala sekolah menyetujui, dan orang tua melihat rapor ananda secara langsung.</p>
+        <div class="pintu">
+          <div class="card"><div class="fi">${ic('co_present')}</div><h2>Guru & Staf</h2>
+            <p class="muted">Isi nilai, susun rapor, ajukan, dan setujui rapor.</p>
+            <a class="btn primary lg" href="#/masuk">${ic('login', 'sm')}Masuk Guru / Staf</a></div>
+          <div class="card"><div class="fi ok">${ic('family_restroom')}</div><h2>Orang Tua / Wali</h2>
+            <p class="muted">Lihat rapor ananda dengan NISN dan PIN dari sekolah.</p>
+            <a class="btn ok lg" href="#/ortu">${ic('visibility', 'sm')}Buka Portal Orang Tua</a></div>
+          <div class="card"><div class="fi warn">${ic('qr_code_scanner')}</div><h2>Cek Keaslian Rapor</h2>
+            <p class="muted">Scan QR pada rapor, atau ketik kode yang tercetak di bawahnya.</p>
+            ${formCekKode()}</div>
+        </div>
+        <div class="row wrap gap-12 mt-16 small">
+          <a href="#/panduan">${ic('menu_book', 'sm')} Panduan & fitur aplikasi</a>
+          <span data-sk-wa="Halo operator {sekolah}, saya ingin bertanya tentang rapor digital." data-label="Hubungi operator via WhatsApp" data-tanpa=""></span></div>
       </div></section>
-      <section class="sec" id="fitur"><div class="kontainer">
-        <h2>Fitur utama</h2><p class="muted mb-12">Dirancang dari alur kerja rapor SD yang biasa dikerjakan di Excel.</p>
-        <div class="feat">
-          ${[['grid_on', 'Grid nilai mirip Excel', 'Navigasi panah/Enter/Tab, tempel langsung dari Excel (Ctrl+V), simpan otomatis per sel.'],
-             ['auto_awesome', 'Deskripsi otomatis', 'Capaian tertinggi & terendah disusun dari teks TP dan predikat. Guru tetap bisa mengubah kalimatnya.'],
-             ['diversity_3', 'Kokurikuler 8 dimensi', 'Kegiatan kokurikuler dengan capaian per dimensi profil lulusan dan narasi rapor otomatis.'],
-             ['verified', 'Persetujuan & kunci', 'Wali kelas mengajukan, kepala sekolah menyetujui, nilai terkunci dan tercatat di audit log.'],
-             ['qr_code_2', 'QR verifikasi', 'Setiap rapor yang disetujui punya kode unik untuk mengecek keaslian dokumen.'],
-             ['family_restroom', 'Portal orang tua', 'Orang tua melihat rapor anaknya dengan NISN + PIN dan mengirim tanda terima.']]
-            .map(f => html`<div class="card"><div class="fi">${ic(f[0])}</div><h3>${f[1]}</h3><p class="muted small mt-8">${f[2]}</p></div>`)}
-        </div></div></section>
-      <section class="sec alt" id="alur"><div class="kontainer">
-        <h2>5 langkah terbit rapor</h2>
-        <div class="steps mt-16">${[['Persiapan', 'Operator mengisi profil sekolah, siswa, rombel & pengampu.'], ['Perencanaan', 'Guru mengisi lingkup materi & tujuan pembelajaran.'],
-          ['Penilaian', 'Guru mapel & wali kelas mengisi nilai bersamaan.'], ['Persetujuan', 'Kepala sekolah meninjau, menyetujui, lalu dikunci.'], ['Terbit', 'Cetak PDF sekelas, bagikan ke portal orang tua.']]
-          .map((s, i) => html`<div class="card step"><div class="n">${i + 1}</div><h3>${s[0]}</h3><p class="small muted mt-8">${s[1]}</p></div>`)}</div>
-      </div></section>
-      <section class="sec"><div class="kontainer"><div class="card pad" style="background:linear-gradient(120deg,#1e3a8a,#2563eb);color:#fff;border:0">
-        <span class="pill" style="background:rgba(255,255,255,.15);color:#fff">Permendikdasmen No. 13 Tahun 2025</span>
-        <h2 class="mt-12" style="color:#fff">Kokurikuler 8 Dimensi Profil Lulusan</h2>
-        <div class="dim8 mt-16">${DIMENSI8.map(d => html`<div>${ic('star', 'sm')} ${d}</div>`)}</div></div></div></section>
-      <footer class="footer"><div class="kontainer row between wrap"><span>RaporKilat SD · Rapor digital Kurikulum Merdeka</span><span>Data tersimpan di Google Sheets milik sekolah</span></div></footer>
+      <footer class="footer"><div class="kontainer row between wrap gap-8"><span><span data-sk-nama>${(i && i.nama) || 'Rapor Digital Sekolah'}</span> · Rapor digital Kurikulum Merdeka</span><span>Data tersimpan di Google Sheets milik sekolah</span></div></footer>
     </div>`);
+    ikatCekKode(view);
+    Sekolah.pasang(view);
   }
 });
 
@@ -64,26 +109,37 @@ route('/masuk', {
   async render(view) {
     if (S.token && !S.isOrtu) return go('/beranda');
     mount(view, html`<div class="auth-wrap">
-      <div class="auth-art"><a class="brand" href="#/"><span class="logo" style="background:rgba(255,255,255,.2)">${ic('auto_stories')}</span>RaporKilat SD</a>
+      <div class="auth-art"><a class="brand" href="#/" data-sk-brand></a>
         <div><h2>Rapor sekelas tanpa lembur.</h2><p class="mt-8">Nilai tersimpan otomatis, deskripsi tersusun sendiri, dan semua guru bekerja di data yang sama.</p></div>
-        <div class="small" style="opacity:.75">Kurikulum Merdeka · Kokurikuler 8 Dimensi</div></div>
+        <div class="small" style="opacity:.75" data-sk-ta></div></div>
       <div class="auth-form"><form class="box col gap-16" data-f novalidate>
+        <a class="sk-kepala" href="#/"><span data-sk-logo></span><span><b data-sk-nama></b><small data-sk-ta></small></span></a>
         <div><h1>Masuk</h1><p class="muted mt-8">Untuk operator, guru, wali kelas, dan kepala sekolah.</p></div>
-        <div class="field"><label for="em">Email</label><input class="input" id="em" name="email" type="text" inputmode="email" autocomplete="username" required placeholder="nama@sekolah.sch.id"></div>
-        <div class="field"><label for="pw">Kata sandi</label><div class="row"><input class="input" id="pw" name="password" type="password" autocomplete="current-password" required>
-          <button class="btn icon ghost" type="button" data-lihat aria-label="Tampilkan kata sandi">${ic('visibility', 'sm')}</button></div></div>
-        <div class="errmsg err-t small" data-err role="alert"></div>
+        <div class="field"><label for="em">Email</label><input class="input" id="em" name="email" type="email" autocomplete="username" required
+          spellcheck="false" autocapitalize="none" enterkeyhint="next" aria-invalid="false" placeholder="nama@sekolah.sch.id"></div>
+        <div class="field"><label for="pw">Kata sandi</label><div class="row"><input class="input" id="pw" name="password" type="password" autocomplete="current-password" required
+          spellcheck="false" autocapitalize="none" enterkeyhint="go" aria-invalid="false">
+          <button class="btn icon ghost" type="button" data-lihat aria-label="Tampilkan kata sandi" aria-controls="pw">${ic('visibility', 'sm')}</button></div></div>
+        <div class="errmsg err-t small" data-err id="err-masuk"></div>
         <button class="btn primary lg" type="submit">${ic('login', 'sm')}Masuk</button>
-        <div class="small muted">Lupa kata sandi? Hubungi operator sekolah untuk reset.<br>Orang tua/wali? <a href="#/ortu">Masuk ke Portal Orang Tua</a></div>
+        <div class="col gap-8 small muted"><span>Lupa kata sandi? Operator sekolah dapat meresetnya.</span>
+          <span data-sk-wa="Halo operator {sekolah}, saya lupa kata sandi Rapor Digital. Nama saya: " data-label="Minta reset sandi via WhatsApp" data-tanpa=""></span>
+          <span>Orang tua/wali? <a href="#/ortu">Masuk ke Portal Orang Tua</a></span></div>
       </form></div></div>`);
+    Sekolah.pasang(view);
     const f = $('[data-f]', view);
-    $('[data-lihat]', view).onclick = () => { const i = $('#pw', view); i.type = i.type === 'password' ? 'text' : 'password'; };
+    ikatLihatSandi($('[data-lihat]', view), $('#pw', view));
+    const em = $('#em', view), pw = $('#pw', view);
+    f.addEventListener('input', e => { if (e.target.getAttribute('aria-invalid') === 'true') galatForm(f, ''); });
     f.onsubmit = async e => {
       e.preventDefault();
-      const d = nilaiForm(f), err = $('[data-err]', f), btn = $('button[type=submit]', f);
-      err.textContent = '';
-      if (!d.email || !d.password) { err.textContent = 'Email dan kata sandi wajib diisi.'; return; }
+      const d = nilaiForm(f), btn = $('button[type=submit]', f);
+      galatForm(f, '');
+      const kosongE = !d.email.trim(), kosongP = !d.password;
+      if (kosongE || kosongP) return galatForm(f, kosongE && kosongP ? 'Email dan kata sandi wajib diisi.' : kosongE ? 'Email wajib diisi.' : 'Kata sandi wajib diisi.', [kosongE && em, kosongP && pw]);
+      if (!em.checkValidity()) return galatForm(f, 'Format email belum benar, contoh: nama@sekolah.sch.id', [em]);
       btn.classList.add('busy');
+      const lambat = setTimeout(() => toast('Menghubungkan ke server sekolah… pertama kali bisa sampai 10 detik.', 'info'), 3000);
       try {
         const r = await API.call('login', { email: d.email.trim(), password: d.password });
         simpanSesi(r.token, r.user);
@@ -91,8 +147,10 @@ route('/masuk', {
         if (r.boot) terapkanBoot(r.boot); else await muatBoot(true);
         Simpan.pulihkan();
         go('/beranda');
-      } catch (ex) { err.textContent = ex.message; }
-      finally { btn.classList.remove('busy'); }
+        // P1.4: sandi awal dari operator wajib diganti
+        if (r.wajibGanti) setTimeout(() => { toast('Demi keamanan, ganti sandi awal Anda sekarang.', 'warn'); Shell.gantiSandi(true); }, 400);
+      } catch (ex) { galatForm(f, ex.message, /sandi|email|akun|pengguna/i.test(ex.message) ? [pw] : []); }
+      finally { clearTimeout(lambat); btn.classList.remove('busy'); }
     };
   }
 });
@@ -102,27 +160,40 @@ route('/ortu', {
   async render(view) {
     if (S.token && S.isOrtu) return go('/portal');
     mount(view, html`<div class="auth-wrap">
-      <div class="auth-art" style="background:linear-gradient(140deg,#065f46,#047857 55%,#0ea5e9)"><a class="brand" href="#/"><span class="logo" style="background:rgba(255,255,255,.2)">${ic('family_restroom')}</span>Portal Orang Tua</a>
-        <div><h2>Lihat rapor ananda kapan saja.</h2><p class="mt-8">Masuk dengan NISN dan PIN dari sekolah. Rapor tampil setelah disetujui kepala sekolah.</p></div><div></div></div>
-      <div class="auth-form"><form class="box col gap-16" data-f>
+      <div class="auth-art" style="background:linear-gradient(140deg,#065f46,#047857 55%,#0ea5e9)"><a class="brand" href="#/" data-sk-brand></a>
+        <div><h2>Lihat rapor ananda kapan saja.</h2><p class="mt-8">Masuk dengan NISN dan PIN dari sekolah. Rapor tampil setelah disetujui kepala sekolah.</p></div><div class="small" style="opacity:.75" data-sk-ta></div></div>
+      <div class="auth-form"><form class="box col gap-16" data-f novalidate>
+        <a class="sk-kepala" href="#/"><span data-sk-logo></span><span><b data-sk-nama></b><small data-sk-ta></small></span></a>
         <div><h1>Portal Orang Tua</h1><p class="muted mt-8">PIN 6 digit diberikan oleh wali kelas/operator.</p></div>
-        <div class="field"><label for="ns">NISN ananda</label><input class="input" id="ns" name="nisn" inputmode="numeric" maxlength="10" autocomplete="username" required></div>
-        <div class="field"><label for="pn">PIN</label><input class="input" id="pn" name="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" required></div>
-        <div class="errmsg err-t small" data-err role="alert"></div>
+        <div class="field"><label for="ns">NISN ananda</label><input class="input" id="ns" name="nisn" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="username" required
+          spellcheck="false" enterkeyhint="next" aria-invalid="false" aria-describedby="ns-h"><small class="xs muted" id="ns-h">10 digit angka, ada di kartu pelajar/rapor.</small></div>
+        <div class="field"><label for="pn">PIN</label><div class="row"><input class="input" id="pn" name="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" required
+          spellcheck="false" enterkeyhint="go" aria-invalid="false">
+          <button class="btn icon ghost" type="button" data-lihat aria-label="Tampilkan PIN" aria-controls="pn">${ic('visibility', 'sm')}</button></div></div>
+        <div class="errmsg err-t small" data-err id="err-ortu"></div>
         <button class="btn ok lg" type="submit">${ic('login', 'sm')}Masuk</button>
-        <div class="small muted"><a href="#/masuk">Masuk sebagai guru/staf</a></div></form></div></div>`);
-    const f = $('[data-f]', view);
+        <div class="col gap-8 small muted"><span>Belum punya PIN atau lupa PIN? Minta ke wali kelas atau operator sekolah.</span>
+          <span data-sk-wa="Halo operator {sekolah}, saya orang tua siswa dan lupa PIN Portal Orang Tua. Nama ananda: , kelas: " data-label="Minta PIN via WhatsApp" data-tanpa=""></span>
+          <span><a href="#/masuk">Masuk sebagai guru/staf</a></span></div></form></div></div>`);
+    Sekolah.pasang(view);
+    const f = $('[data-f]', view), ns = $('#ns', view), pn = $('#pn', view);
+    ikatLihatSandi($('[data-lihat]', view), pn);
+    f.addEventListener('input', e => { if (e.target.getAttribute('aria-invalid') === 'true') galatForm(f, ''); });
     f.onsubmit = async e => {
       e.preventDefault();
-      const d = nilaiForm(f), err = $('[data-err]', f), btn = $('button[type=submit]', f);
-      err.textContent = '';
+      const d = nilaiForm(f), btn = $('button[type=submit]', f);
+      galatForm(f, '');
+      d.nisn = d.nisn.replace(/\s+/g, ''); d.pin = d.pin.trim();
+      if (!d.nisn || !d.pin) return galatForm(f, !d.nisn && !d.pin ? 'NISN dan PIN wajib diisi.' : !d.nisn ? 'NISN wajib diisi.' : 'PIN wajib diisi.', [!d.nisn && ns, !d.pin && pn]);
+      if (!/^\d+$/.test(d.nisn)) return galatForm(f, 'NISN hanya berisi angka.', [ns]);
       btn.classList.add('busy');
+      const lambat = setTimeout(() => toast('Menghubungkan ke server sekolah… pertama kali bisa sampai 10 detik.', 'info'), 3000);
       try {
-        const r = await API.call('loginOrtu', { nisn: d.nisn.trim(), pin: d.pin.trim() });
+        const r = await API.call('loginOrtu', { nisn: d.nisn, pin: d.pin });
         simpanSesi(r.token, r.user);
         go('/portal');
-      } catch (ex) { err.textContent = ex.message; }
-      finally { btn.classList.remove('busy'); }
+      } catch (ex) { galatForm(f, ex.message, /pin|nisn/i.test(ex.message) ? [pn] : []); }
+      finally { clearTimeout(lambat); btn.classList.remove('busy'); }
     };
   }
 });
@@ -143,7 +214,10 @@ route('/v/:kode', {
         <tr><td class="muted">Kelas</td><td>${r.kelas}</td></tr><tr><td class="muted">Rapor</td><td>${r.jenis} · ${r.periode}</td></tr>
         <tr><td class="muted">Rata-rata</td><td>${r.rata}</td></tr><tr><td class="muted">Diterbitkan</td><td>${tglID(String(r.diterbitkan).slice(0, 10))}</td></tr>
         <tr><td class="muted">Sidik digital</td><td class="mono small">${r.hash}…</td></tr></tbody></table>` : ''}
-      <p class="xs muted">Kode: ${p.kode}</p></div>`);
+      <p class="xs muted">Kode: ${p.kode}</p>
+      <div class="col gap-8" style="text-align:left"><span class="small muted">Cek kode lain:</span>${formCekKode()}</div></div>`);
+    ikatCekKode(view);
+    Sekolah.pasang(view);
   }
 });
 
@@ -159,8 +233,20 @@ route('/panduan', {
     mount(view, html`<div class="pub">${navPublik()}<div class="kontainer" style="max-width:820px;padding:32px 20px">
       <h1>Panduan Singkat</h1><p class="muted mt-8">Urutan kerja satu semester.</p>
       <div class="col gap-12 mt-16">${langkah.map((l, i) => html`<div class="card pad row" style="align-items:flex-start"><div class="step" style="padding:0"><div class="n">${i + 1}</div></div><div><h3>${l[0]}</h3><p class="muted mt-8">${l[1]}</p></div></div>`)}</div>
+      <h2 class="mt-24" id="fitur">Fitur aplikasi</h2>
+      <div class="feat mt-12">
+        ${[['grid_on', 'Grid nilai mirip Excel', 'Navigasi panah/Enter/Tab, tempel langsung dari Excel (Ctrl+V), simpan otomatis per sel.'],
+           ['auto_awesome', 'Deskripsi otomatis', 'Capaian tertinggi & terendah disusun dari teks TP dan predikat. Guru tetap bisa mengubah kalimatnya.'],
+           ['diversity_3', 'Kokurikuler 8 dimensi', 'Capaian per dimensi profil lulusan (Permendikdasmen No. 13 Tahun 2025) dan narasi rapor otomatis.'],
+           ['verified', 'Persetujuan & kunci', 'Wali kelas mengajukan, kepala sekolah menyetujui, nilai terkunci dan tercatat di audit log.'],
+           ['qr_code_2', 'QR verifikasi', 'Setiap rapor yang disetujui punya kode unik untuk mengecek keaslian dokumen.'],
+           ['family_restroom', 'Portal orang tua', 'Orang tua melihat rapor anaknya dengan NISN + PIN dan mengirim tanda terima.']]
+          .map(f => html`<div class="card"><div class="fi">${ic(f[0])}</div><h3>${f[1]}</h3><p class="muted small mt-8">${f[2]}</p></div>`)}
+      </div>
+      <p class="small muted mt-12">8 dimensi profil lulusan: ${DIMENSI8.join(' · ')}.</p>
       <div class="alert mt-16">${ic('keyboard')}<div><b>Pintasan grid nilai:</b> panah/Enter/Tab pindah sel · ketik angka langsung menimpa · Delete menghapus · Ctrl+V menempel blok dari Excel · Ctrl+Z membatalkan · Esc membatalkan ketikan.</div></div>
-      <p class="mt-16"><a class="btn primary" href="${S.token ? '#/beranda' : '#/masuk'}">${ic('arrow_back', 'sm')}Kembali</a></p></div></div>`);
+      <p class="mt-16"><a class="btn primary" href="${S.token ? '#/beranda' : '#/'}">${ic('arrow_back', 'sm')}Kembali</a></p></div></div>`);
+    Sekolah.pasang(view);
   }
 });
 
@@ -168,5 +254,6 @@ route('/404', {
   judul: 'Tidak ditemukan',
   render(view) {
     mount(view, html`<div class="pub">${navPublik()}<div class="kontainer">${kosong('travel_explore', 'Halaman tidak ditemukan', 'Alamat yang Anda buka tidak tersedia.', html`<a class="btn primary" href="#/">Ke beranda</a>`)}</div></div>`);
+    Sekolah.pasang(view);
   }
 });

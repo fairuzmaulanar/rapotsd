@@ -8,7 +8,7 @@
 /* ---------- PWA: service worker + pemberitahuan versi baru ---------- */
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
+    navigator.serviceWorker.register(TT.url('./sw.js')).then(reg => {
       reg.addEventListener('updatefound', () => {
         const sw = reg.installing;
         if (!sw) return;
@@ -36,25 +36,30 @@ function tawarkanMuatUlang() {
 
 /* ---------- Tombol "Pasang aplikasi" (Add to Home Screen) ---------- */
 const Pasang = (() => {
+  // modern-web-guidance (pwa/install): utamakan navigator.install() bila ada; cadangan beforeinstallprompt.
+  // Event prompt hanya bisa dipakai sekali → dikosongkan SEBELUM menunggu jawaban pengguna.
   let prompt = null;
+  const adaInstall = typeof Navigator !== 'undefined' && 'install' in Navigator.prototype;
+  const sudahTerpasang = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const btn = () => $('#btnPasang');
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    prompt = e;
-    if (LS.get('rk:pasang-tutup')) return;
-    const b = btn();
-    if (b) b.hidden = false;
-  });
-  window.addEventListener('appinstalled', () => { prompt = null; const b = btn(); if (b) b.hidden = true; toast('Aplikasi terpasang di perangkat Anda.', 'ok'); });
+  const tampil = v => { const b = btn(); if (b) b.hidden = !v || !!LS.get('rk:pasang-tutup') || sudahTerpasang(); };
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); prompt = e; tampil(true); });
+  window.addEventListener('appinstalled', () => { prompt = null; tampil(false); toast('Aplikasi terpasang di perangkat Anda.', 'ok'); });
+  if (adaInstall) tampil(true);   // skrip defer: #btnPasang sudah ada di DOM
   document.addEventListener('click', async e => {
-    if (e.target.closest('#btnPasang [data-tutup]')) { LS.set('rk:pasang-tutup', 1); btn().hidden = true; return; }
-    if (!e.target.closest('#btnPasang [data-pasang]') || !prompt) return;
-    prompt.prompt();
-    const r = await prompt.userChoice;
-    if (r.outcome === 'accepted') btn().hidden = true;
-    prompt = null;
+    if (e.target.closest('#btnPasang [data-tutup]')) { LS.set('rk:pasang-tutup', 1); tampil(false); return; }
+    if (!e.target.closest('#btnPasang [data-pasang]')) return;
+    if (adaInstall) {
+      try { await navigator.install(); tampil(false); return; }   // dipanggil langsung di klik (butuh aktivasi pengguna)
+      catch (ex) { if (ex && ex.name === 'AbortError') return; if (!prompt) { toast('Gunakan menu browser → "Pasang aplikasi" / "Tambahkan ke layar utama".', 'info'); return; } }
+    }
+    if (!prompt) return;
+    const p = prompt; prompt = null; tampil(false);
+    p.prompt();
+    const r = await p.userChoice;
+    if (r.outcome !== 'accepted') tampil(false);
   });
-  return { bisa: () => !!prompt };
+  return { bisa: () => !!prompt || adaInstall };
 })();
 
 /* ---------- Lembar rapor menyesuaikan lebar layar (tanpa geser horizontal) ---------- */
@@ -84,4 +89,8 @@ window.addEventListener('unhandledrejection', e => {
     history.replaceState(null, '', '#' + (S.token ? (S.isOrtu ? '/portal' : '/beranda') : '/'));
   }
   render();
+  // P1.2: bangunkan server Apps Script selagi orang membaca halaman / mengetik sandi
+  if (!S.token && window.CONFIG && CONFIG.GAS_URL && !/GANTI_DENGAN/.test(CONFIG.GAS_URL)) {
+    fetch(CONFIG.GAS_URL + '?action=ping').catch(() => {});
+  }
 })();

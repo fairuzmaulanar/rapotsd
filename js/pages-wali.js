@@ -4,11 +4,12 @@
    ============================================================ */
 'use strict';
 
+const LABEL_ABSEN = { sakit: 'Sakit', izin: 'Izin', alpa: 'Alpa' };
 function ctxRombel(daftar, rb, extra = '') {
   return html`<div class="card ctxbar">
-    <div class="field" style="min-width:220px"><label for="pilih-rb">Rombel</label><select class="select" id="pilih-rb" data-pilih-rb>${pilihanRombel(daftar, rb.id)}</select></div>
-    <div class="field"><label>Wali kelas</label><div class="row" style="min-height:36px"><span class="badge pri">${ic('person', 'sm')}${B.user(rb.wali_id).nama || 'Belum ditetapkan'}</span></div></div>
-    <div class="field"><label>Status rapor semester</label><div class="row" style="min-height:36px">${badgeStatus(B.status(rb.id, 'SAS'))}</div></div>
+    <div class="field utama"><label for="pilih-rb">Rombel</label><select class="select" id="pilih-rb" data-pilih-rb>${pilihanRombel(daftar, rb.id)}</select></div>
+    <div class="field"><label>Wali kelas</label><div class="row isi"><span class="badge pri">${ic('person', 'sm')}${B.user(rb.wali_id).nama || 'Belum ditetapkan'}</span></div></div>
+    <div class="field"><label>Status rapor semester</label><div class="row isi">${badgeStatus(B.status(rb.id, 'SAS'))}</div></div>
     <span class="grow"></span>${extra}</div>`;
 }
 function ikatPilihRb(view) {
@@ -51,14 +52,14 @@ route('/kelas', {
           <button class="btn sm ghost" data-a="nol">${ic('exposure_zero', 'sm')}Absensi kosong → 0</button>
           <button class="btn sm ghost" data-a="ekskulWajib">${ic('hiking', 'sm')}Ekskul wajib ke semua siswa</button>
           ${sem2 ? html`<button class="btn sm ghost" data-a="naikSemua">${ic('trending_up', 'sm')}Semua ${Number(rombel.tingkat) >= 6 ? 'lulus' : 'naik kelas'}</button>` : ''}</div>` : ''}
-        <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="c">No</th><th>Nama</th><th class="c">Sakit</th><th class="c">Izin</th><th class="c">Alpa</th>
+        <div class="card"><div class="tbl-wrap"><table class="tbl tbl-kartu"><thead><tr><th class="c">No</th><th>Nama</th><th class="c">Sakit</th><th class="c">Izin</th><th class="c">Alpa</th>
           ${sem2 ? html`<th>${Number(rombel.tingkat) >= 6 ? 'Lulus' : 'Naik kelas'}</th>` : ''}<th style="min-width:200px">Ekstrakurikuler</th><th style="min-width:320px">Catatan wali kelas</th></tr></thead>
           <tbody>${wd.anggota.map(a => { const d = wd.data[a.id] || {}; return html`<tr data-aid="${a.id}">
-            <td class="c muted">${a.no_absen}</td><td><b>${a.nama}</b><div class="xs muted">${a.nisn || ''}</div></td>
-            ${['sakit', 'izin', 'alpa'].map(f => html`<td class="c"><input class="input num" style="width:64px;text-align:center" type="number" min="0" max="200" inputmode="numeric" data-f="${f}" value="${d[f] === undefined ? '' : d[f]}" ${dis}></td>`)}
-            ${sem2 ? html`<td><select class="select" style="min-width:110px" data-f="naik" ${dis}><option value="">–</option><option value="ya" ${d.naik === 'ya' ? raw('selected') : ''}>Ya</option><option value="tidak" ${d.naik === 'tidak' ? raw('selected') : ''}>Tidak</option></select></td>` : ''}
-            <td><button class="btn sm ghost" data-ekskul style="max-width:260px;justify-content:flex-start" ${dis}>${ic('sports_soccer', 'sm')}<span class="trunc">${ekskulTeks(d.ekskul) || 'Atur ekskul'}</span></button></td>
-            <td><textarea class="textarea" rows="2" style="min-height:44px" data-f="catatan" placeholder="Catatan perkembangan ananda…" ${dis}>${d.catatan || ''}</textarea>
+            <td class="c muted no">${a.no_absen}</td><td class="nama"><b>${a.nama}</b><div class="xs muted">${a.nisn || ''}</div></td>
+            ${['sakit', 'izin', 'alpa'].map(f => html`<td class="c" data-label="${LABEL_ABSEN[f]}"><input aria-label="${LABEL_ABSEN[f]} — ${a.nama}"  class="input num" style="width:64px;text-align:center" type="number" min="0" max="200" inputmode="numeric" data-f="${f}" value="${d[f] === undefined ? '' : d[f]}" ${dis}></td>`)}
+            ${sem2 ? html`<td class="lebar" data-label="${Number(rombel.tingkat) >= 6 ? 'Lulus' : 'Naik kelas'}"><select class="select" style="min-width:110px" data-f="naik" ${dis}><option value="">–</option><option value="ya" ${d.naik === 'ya' ? raw('selected') : ''}>Ya</option><option value="tidak" ${d.naik === 'tidak' ? raw('selected') : ''}>Tidak</option></select></td>` : ''}
+            <td class="lebar" data-label="Ekstrakurikuler"><button class="btn sm ghost" data-ekskul style="max-width:260px;justify-content:flex-start" ${dis}>${ic('sports_soccer', 'sm')}<span class="trunc">${ekskulTeks(d.ekskul) || 'Atur ekskul'}</span></button></td>
+            <td class="lebar" data-label="Catatan wali kelas"><textarea class="textarea" rows="2" style="min-height:44px" data-f="catatan" placeholder="Catatan perkembangan ananda…" ${dis}>${d.catatan || ''}</textarea>
               ${!kunci ? html`<button class="btn sm text" data-saran>${ic('lightbulb', 'sm')}Saran kalimat</button>` : ''}</td></tr>`; })}</tbody></table></div>
           ${!wd.anggota.length ? kosong('person_off', 'Rombel belum punya siswa', 'Operator menambahkan siswa di menu Rombel & Pengampu.') : ''}</div>`);
     };
@@ -161,7 +162,7 @@ route('/kokurikuler', {
         <div class="card"><div class="card-h"><div><h3>${keg.judul}</h3><div class="small muted">${keg.tema || ''} · ${keg.dimensi_ids.map(d => dim(d).nama).join(', ')}</div></div>
           ${!kunci ? html`<div class="row"><button class="btn sm ghost" data-ubah>${ic('edit', 'sm')}Ubah</button><button class="btn sm ghost" data-hapus>${ic('delete', 'sm err-t')}Hapus</button></div>` : ''}</div>
           <div class="tbl-wrap"><table class="tbl"><thead><tr><th class="c">No</th><th>Nama</th>${keg.dimensi_ids.map(d => html`<th style="min-width:150px">${dim(d).nama}
-            ${!kunci ? html`<select class="select" style="margin-top:4px;font-size:11px;min-height:28px;padding:2px 24px 2px 6px" data-isisemua="${d}"><option value="">Isi semua…</option>${CAPAIAN.map(c => html`<option>${c}</option>`)}</select>` : ''}</th>`)}
+            ${!kunci ? html`<select class="select mini" data-isisemua="${d}"><option value="">Isi semua…</option>${CAPAIAN.map(c => html`<option>${c}</option>`)}</select>` : ''}</th>`)}
             <th style="min-width:260px">Catatan proses</th></tr></thead>
             <tbody>${kd.anggota.map(a => html`<tr data-aid="${a.id}"><td class="c muted">${a.no_absen}</td><td><b>${a.nama}</b></td>
               ${keg.dimensi_ids.map(d => { const v = ((keg.nilai || {})[a.id] || {})[d] || ''; return html`<td><select class="select" data-d="${d}" ${dis}><option value="">–</option>${CAPAIAN.map(c => html`<option ${v === c ? raw('selected') : ''}>${c}</option>`)}</select></td>`; })}
@@ -259,6 +260,7 @@ route('/rapor', {
     $('[data-jenis]', view).onclick = e => { const b = e.target.closest('button'); if (b) { S.ctx.jenis = b.dataset.v; S.simpanCtx(); render(); } };
     $('[data-tab]', view).onclick = e => { const b = e.target.closest('button'); if (b) { S.ctx.tabRapor = b.dataset.v; S.simpanCtx(); render(); } };
     const isi = $('[data-isi]', view);
+    Tab.pasang($('[data-tab]', view), isi, tab, { kunci: 'rapor', label: 'Bagian leger & rapor' });
     const arg = { rombel_id: rombel.id, periode_id: S.periodeId, jenis };
     if (tab === 'leger') await tabLeger(isi, arg, p);
     if (tab === 'rapor') await tabRapor(isi, arg, p);
@@ -272,7 +274,11 @@ async function tabLeger(isi, arg, p) {
     const rk = /^(ya|true)$/i.test(String(S.pengaturan.tampil_ranking || ''));
     const kk = {};
     S.boot.mapelRombel.filter(m => m.rombel_id === arg.rombel_id).forEach(m => { kk[m.id] = Number(m.kktp); });
-    mount(isi, html`${lg.kelengkapan.masalah.length ? html`<div class="alert warn mb-12">${ic('pending')}<div><b>Kelengkapan nilai ${lg.kelengkapan.persen}%.</b> ${lg.kelengkapan.masalah.slice(0, 6).join(' · ')}${lg.kelengkapan.masalah.length > 6 ? ' · …' : ''}</div></div>`
+    // P3.5: kekurangan nilai sebagai daftar yang bisa diklik → langsung ke grid mapel tersebut
+    const det = lg.kelengkapan.detail || [];
+    mount(isi, html`${lg.kelengkapan.masalah.length ? html`<div class="alert warn mb-12 kurang">${ic('pending')}<div class="grow"><b>Kelengkapan nilai ${lg.kelengkapan.persen}%.</b>
+        ${det.length ? html` Ketuk mapel untuk melengkapi:<div class="row wrap gap-8 mt-8">${det.map(x => { const g = B.user((B.mr(x.mr) || {}).guru_id).nama; return html`<button class="btn sm ghost" data-ke-mr="${x.mr}" title="${g ? 'Pengampu: ' + g : 'Buka grid nilai'}">${x.mapel}<span class="badge warn">${x.kurang} siswa</span></button>`; })}</div>`
+          : html` ${lg.kelengkapan.masalah.slice(0, 6).join(' · ')}${lg.kelengkapan.masalah.length > 6 ? ' · …' : ''}`}</div></div>`
       : html`<div class="alert ok mb-12">${ic('task_alt')}<div><b>Semua nilai lengkap.</b> Leger siap diperiksa dan rapor siap diajukan.</div></div>`}
       <div class="card"><div class="toolbar" style="border-bottom:1px solid var(--line)"><b>Leger ${lg.jenis === 'STS' ? 'tengah semester' : 'akhir semester'}</b><span class="grow"></span>
         <button class="btn sm ghost" data-xlsx>${ic('table_view', 'sm')}Unduh .xlsx</button><button class="btn sm ghost" data-cetak>${ic('print', 'sm')}Cetak leger</button></div>
@@ -281,6 +287,7 @@ async function tabLeger(isi, arg, p) {
           <td class="c num">${r.jumlah || ''}</td><td class="c num bold">${r.rata === null ? '–' : r.rata}</td>${rk ? html`<td class="c">${r.rank || ''}</td>` : ''}<td class="c">${r.sakit}</td><td class="c">${r.izin}</td><td class="c">${r.alpa}</td></tr>`)}
           <tr style="background:var(--surface-2)"><td></td><td><b>Rata-rata kelas</b></td>${lg.kolom.map(k => html`<td class="c bold">${lg.rataKolom[k.id] === null ? '–' : lg.rataKolom[k.id]}</td>`)}<td colspan="${rk ? 6 : 5}"></td></tr></tbody></table></div></div>
       <div class="print-area hide" data-pa></div>`);
+    $$('[data-ke-mr]', isi).forEach(b => { b.onclick = () => { S.ctx.mr = b.dataset.keMr; S.simpanCtx(); go('/nilai'); }; });
     $('[data-xlsx]', isi).onclick = async () => {
       await Lazy('js/xlsx-lite.js');
       const rows = [['No', 'NISN', 'Nama', ...lg.kolom.map(k => k.nama), 'Jumlah', 'Rata-rata', ...(rk ? ['Ranking'] : []), 'Sakit', 'Izin', 'Alpa']];
@@ -307,18 +314,26 @@ async function tabRapor(isi, arg, p) {
     const opsi = Object.assign({}, OpsiCetak, { kertas: OpsiCetak.kertas || S.pengaturan.kertas || 'A4' });
     const daftar = semua ? r : [r[idx]];
     mount(stage, html`${daftar.map(x => html`${opsi.identitas ? Cetak.lembarIdentitas(data, x, opsi) : ''}${Cetak.lembar(data, x, opsi)}`)}`);
-    mount($('[data-nav]', isi), html`<button class="btn sm ghost" data-prev ${idx === 0 || semua ? raw('disabled') : ''}>${ic('chevron_left', 'sm')}</button>
+    mount($('[data-nav]', isi), html`<button class="btn sm ghost" data-prev aria-label="Siswa sebelumnya" title="Siswa sebelumnya" ${idx === 0 || semua ? raw('disabled') : ''}>${ic('chevron_left', 'sm')}</button>
       <select class="select" style="max-width:320px" data-siswa ${semua ? raw('disabled') : ''}>${r.map((x, i) => html`<option value="${i}" ${i === idx ? raw('selected') : ''}>[${x.no_absen}] ${x.siswa.nama}</option>`)}</select>
-      <button class="btn sm ghost" data-next ${idx >= r.length - 1 || semua ? raw('disabled') : ''}>${ic('chevron_right', 'sm')}</button>
+      <button class="btn sm ghost" data-next aria-label="Siswa berikutnya" title="Siswa berikutnya" ${idx >= r.length - 1 || semua ? raw('disabled') : ''}>${ic('chevron_right', 'sm')}</button>
       <span class="small muted">${semua ? 'Semua ' + r.length + ' siswa' : (idx + 1) + ' dari ' + r.length}</span><span class="grow"></span>
       <label class="check"><input type="checkbox" data-semua ${semua ? raw('checked') : ''}>Tampilkan sekelas</label>
-      <button class="btn sm primary" data-print>${ic('print', 'sm')}${semua ? 'Cetak / PDF sekelas' : 'Cetak / PDF'}</button>`);
+      <button class="btn sm ghost" data-pdf1 ${semua ? raw('hidden') : ''}>${ic('picture_as_pdf', 'sm')}Unduh PDF</button>
+      <button class="btn sm ghost" data-pdfzip title="Satu file PDF per siswa, dibungkus .zip">${ic('folder_zip', 'sm')}PDF per siswa (.zip)</button>
+      <button class="btn sm primary" data-print>${ic('print', 'sm')}${semua ? 'Cetak sekelas' : 'Cetak'}</button>`);
     Cetak.gambarQR(stage).catch(() => {});
   };
   isi.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || !data) return;
     if (b.dataset.prev !== undefined) { idx--; gambar(); }
     if (b.dataset.next !== undefined) { idx++; gambar(); }
+    const opsiPdf = () => Object.assign({}, OpsiCetak, { kertas: OpsiCetak.kertas || S.pengaturan.kertas || 'A4' });
+    if (b.dataset.pdf1 !== undefined) {
+      b.classList.add('busy');
+      PDFRapor.unduhSatu(data, data.rapor[idx], opsiPdf()).catch(ex => toast(ex.message, 'err', 'Gagal membuat PDF')).finally(() => b.classList.remove('busy'));
+    }
+    if (b.dataset.pdfzip !== undefined) PDFRapor.unduhZip(data, data.rapor, opsiPdf());
     if (b.dataset.print !== undefined) {
       toast('Pada dialog cetak pilih "Simpan sebagai PDF" untuk membuat file PDF.', 'info');
       Cetak.gambarQR(stage).then(() => Cetak.cetak(OpsiCetak.kertas || S.pengaturan.kertas || 'A4'));

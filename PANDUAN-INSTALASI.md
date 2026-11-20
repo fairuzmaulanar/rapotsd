@@ -164,6 +164,7 @@ Tunggu 1–2 menit → muncul `Your site is live at https://USERNAME.github.io/r
 URL `/exec` tetap sama, jadi `config.js` tidak perlu diubah. *Jangan* membuat "Deployment baru" untuk pembaruan — itu menghasilkan URL berbeda.
 
 **Frontend** (dari folder `raporkilat-frontend`):
+Jika Anda mengubah file di `js/`, jalankan dulu `node build.js` (perlu Node.js dari nodejs.org) agar `js/app.min.js` ikut diperbarui.
 ```bash
 git add .
 git commit -m "Pembaruan"
@@ -212,3 +213,55 @@ Jika Anda mengubah berkas di `js/` atau `css/`, naikkan juga nomor `VERSI` di ba
 - **Persetujuan & kode QR di aplikasi ini bukan Tanda Tangan Elektronik tersertifikasi (BSrE/PSrE).** Kode QR membuktikan rapor tercatat dan disetujui di sistem sekolah. Rapor kertas tetap ditandatangani basah dan dicap sesuai ketentuan.
 - PDF dibuat lewat dialog cetak browser (*Simpan sebagai PDF*), sehingga hasilnya sama persis dengan cetakan kertas.
 - Kuota Google Apps Script akun gratis cukup untuk satu sekolah SD (puluhan guru mengisi bersamaan). Satu proyek untuk satu sekolah.
+
+---
+
+## BAGIAN G — Notifikasi, WhatsApp, cadangan, dan PDF (versi 1.4)
+
+### G1. Setelah memperbarui ke versi 1.4 (sekali saja)
+1. Ganti isi **`Kode.gs`** dan **`appsscript.json`** di editor Apps Script. File `appsscript.json` sekarang meminta izin tambahan **mengirim email**.
+2. Jalankan fungsi **`setupAppEnvironment`**. Fungsi ini menambahkan kolom baru (`telp` di Pengguna, `tgl_mutasi` & `ket_mutasi` di Siswa) dan pengaturan notifikasi. Saat diminta izin **"Kirim email atas nama Anda"**, pilih **Izinkan**. Data lama tidak berubah.
+3. **Terapkan → Kelola deployment → Edit → Versi baru → Terapkan.**
+4. Masuk sebagai operator → **Profil, Periode & Predikat** → kartu **Notifikasi rapor** → klik **Pakai alamat ini** → **Simpan** → **Kirim email uji ke saya**. Email akun operator harus alamat asli; alamat berakhiran `@sekolah.id` dan `@demo.sch.id` sengaja dilewati.
+5. Pastikan setiap guru dan kepala sekolah memakai email asli di menu **Pengguna & Peran**, karena notifikasi dikirim ke email itu.
+
+Email dikirim dari akun Google pemilik Apps Script. Kuota harian: ±100 penerima untuk akun Gmail biasa, ±1.500 untuk Google Workspace.
+
+### G2. (Opsional) Notifikasi WhatsApp lewat Fonnte
+1. Daftar di **fonnte.com**, hubungkan nomor WhatsApp sekolah, lalu salin **token** perangkat.
+2. Di editor Apps Script: **Setelan Proyek → Properti skrip → Tambahkan properti skrip**. Isi nama `FONNTE_TOKEN` dan nilai token tersebut, lalu Simpan. **Jangan** menaruh token di kode, spreadsheet, atau GitHub.
+3. Di `appsscript.json`, tambahkan baris `"https://www.googleapis.com/auth/script.external_request"` ke dalam daftar `oauthScopes` (pisahkan dengan koma). Jalankan `setupAppEnvironment` lagi, izinkan **"Terhubung ke layanan eksternal"**, lalu buat **Versi baru** deployment.
+4. Di aplikasi: kartu **Notifikasi rapor** → WhatsApp: **Aktif** → Simpan. Isi **No. WhatsApp** tiap pengguna di menu **Pengguna & Peran**.
+
+### G3. Cadangan data
+- Menu **Profil, Periode & Predikat** → kartu **Cadangan data**:
+  - **Buat salinan di Google Drive**: salinan lengkap database di Drive pemilik Apps Script.
+  - **Unduh cadangan (.json)**: arsip untuk disimpan di laptop.
+- Cadangan otomatis mingguan: editor → **Pemicu → Tambahkan pemicu → `cadanganOtomatis` → Berbasis waktu → Pengatur waktu minggu**.
+- Memulihkan dari salinan Drive: buka **Setelan Proyek → Properti skrip**, ganti nilai `SPREADSHEET_ID` dengan ID spreadsheet salinan, lalu jalankan `bersihkanCache`.
+
+### G4. PDF rapor tanpa dialog cetak
+- Wali kelas: **Leger & Rapor → Pratinjau & cetak** → **Unduh PDF** (satu siswa) atau **PDF per siswa (.zip)** (sekelas, ±1 detik per siswa).
+- Orang tua: tombol **Unduh PDF rapor** di portal. Bila perangkat tidak mendukung, aplikasi otomatis membuka dialog cetak.
+- PDF berisi gambar halaman rapor yang sama persis dengan hasil cetak (teks tidak bisa disalin). Logo dari situs lain hanya ikut tampil bila situs itu mengizinkan; logo yang disimpan di GitHub Pages yang sama selalu tampil.
+
+### G5. Mutasi siswa
+Menu **Data Siswa** → ubah siswa → **Status & mutasi**: Pindah sekolah, Keluar, atau Lulus, beserta tanggal dan keterangan. Siswa langsung keluar dari rombel tahun ajaran ini, sedangkan nilainya tetap tersimpan. Gunakan filter **Siswa mutasi** untuk melihat daftarnya.
+
+---
+
+## BAGIAN H — Pembaruan versi 1.5 (standar web modern)
+
+Pembaruan ini **hanya frontend** — `Kode.gs` dan spreadsheet **tidak perlu diubah**.
+
+1. Salin isi ZIP perbaikan ke folder `raporkilat-frontend` (timpa berkas lama). ZIP tidak berisi `js/config.js`, jadi alamat server Anda tetap.
+2. Unggah: `git add .` → `git commit -m "v1.5.0"` → `git push`.
+3. Buka aplikasi, tunggu notifikasi **"Versi baru tersedia"**, lalu muat ulang (atau **Ctrl+Shift+R**).
+
+Yang berubah bagi pengguna:
+- Jendela (ganti sandi, tambah siswa, konfirmasi, dll.) bisa ditutup dengan **Esc** atau tombol kembali di HP. Jendela tanpa isian juga bisa ditutup dengan mengetuk di luar kotak; jendela berisi isian **tidak** tertutup bila tersentuh di luar, supaya ketikan tidak hilang.
+- Pesan galat di pojok layar tetap tampil sampai ditutup (tombol ×).
+- Menu di HP: tombol × di bagian atas menu, Esc juga menutup.
+- Bila ukuran teks HP/komputer diperbesar di pengaturan, aplikasi ikut membesar tanpa terpotong.
+
+**Bila Anda mengubah kode sendiri:** aplikasi kini mewajibkan *Trusted Types*. Menulis `elemen.innerHTML = '...'` langsung akan ditolak browser (muncul galat di Console). Gunakan `` mount(elemen, html`...`) `` seperti kode yang sudah ada.

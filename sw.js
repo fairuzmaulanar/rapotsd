@@ -6,13 +6,11 @@
      (data selalu segar; cache data diatur oleh js/core.js).
    - Naikkan VERSI setiap kali merilis perubahan frontend.
    ============================================================ */
-const VERSI = 'raporkilat-v1.0.1';
+const VERSI = 'raporkilat-v1.5.0';
 const RUNTIME = 'raporkilat-font';
 const INTI = [
   './', './index.html', './manifest.json', './css/app.css',
-  './js/config.js', './js/core.js', './js/hitung.js', './js/grid.js', './js/cetak.js',
-  './js/pages-publik.js', './js/pages-guru.js', './js/pages-wali.js', './js/pages-kepsek.js',
-  './js/pages-operator.js', './js/pages-ortu.js', './js/app.js',
+  './js/config.js', './js/app.min.js',
   './js/xlsx-lite.js', './js/vendor/qrcode.js', './js/vendor/jszip.min.js',
   './icons/icon-192.png', './icons/icon-512.png'
 ];

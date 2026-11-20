@@ -43,8 +43,9 @@ const XLSXLite = (() => {
     if (!/\.xlsx$/i.test(file.name)) throw new Error('Format harus .xlsx (Excel). Untuk .xls/.csv, buka di Excel lalu "Simpan Sebagai" .xlsx.');
     const Z = await jszip();
     const z = await Z.loadAsync(file);
-    const p = new DOMParser();
-    const x = async n => { const f = z.file(n); return f ? p.parseFromString(await f.async('string'), 'application/xml') : null; };
+    // Trusted Types: parseFromString adalah sink HTML → lewat kebijakan aplikasi (TT.xml) bila ada.
+    const urai = typeof TT !== 'undefined' ? TT.xml : s => new DOMParser().parseFromString(s, 'application/xml');
+    const x = async n => { const f = z.file(n); return f ? urai(await f.async('string')) : null; };
     const ss = [];
     const sst = await x('xl/sharedStrings.xml');
     if (sst) Array.from(sst.getElementsByTagName('si')).forEach(si => ss.push(Array.from(si.getElementsByTagName('t')).map(t => t.textContent).join('')));
