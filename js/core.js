@@ -5,7 +5,7 @@
    ============================================================ */
 'use strict';
 
-const APP_VERSI = '1.0.0';
+const APP_VERSI = '1.0.1';
 
 /* ---------- Utilitas DOM & HTML aman ---------- */
 const $ = (s, el = document) => el.querySelector(s);
@@ -338,6 +338,10 @@ const Simpan = (() => {
 
 /* ---------- Toast ---------- */
 function toast(msg, type = 'info', judul = '') {
+  // Saat modal terbuka, halaman di belakangnya inert & tertutup lapisan atas:
+  // tampilkan pesan di dalam modal agar terlihat dan dibacakan pembaca layar.
+  const dlg = $$('dialog.modal').filter(d => d.open).pop();
+  if (dlg) return pesanModal(dlg, msg, type, judul);
   let box = $('.toasts');
   if (!box) { box = document.createElement('div'); box.className = 'toasts'; box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box); }
   const ikon = { ok: 'check_circle', err: 'error', warn: 'warning', info: 'info' }[type] || 'info';
@@ -348,34 +352,71 @@ function toast(msg, type = 'info', judul = '') {
   setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, type === 'err' ? 6000 : 3500);
 }
 
-/* ---------- Modal ---------- */
+/* ---------- Modal (native <dialog> + showModal) ----------
+   Browser yang mengurus: halaman di belakang inert, fokus terkurung di dalam
+   modal, Esc / gestur kembali di HP menutup modal, fokus kembali ke tombol pemicu. */
+let modalSeq = 0;
+const LIGHT_DISMISS = 'closedBy' in HTMLDialogElement.prototype;
+function pesanModal(dlg, msg, type = 'info', judul = '') {
+  const box = $('.modal-msg', dlg);
+  const ikon = { ok: 'check_circle', err: 'error', warn: 'warning', info: 'info' }[type] || 'info';
+  mount(box, html`<div class="alert ${type === 'info' ? '' : type}" role="${type === 'err' ? 'alert' : 'status'}">${ic(ikon)}<div>${judul ? html`<b>${judul}</b> ` : ''}${msg}</div></div>`);
+  clearTimeout(box._t);
+  if (type !== 'err') box._t = setTimeout(() => { box.textContent = ''; }, 3500);
+}
 function modal({ judul, isi, aksi = [], lebar = '', onBuka }) {
   return new Promise(resolve => {
-    const bg = document.createElement('div');
-    bg.className = 'modal-bg';
+    const id = 'mdl-' + (++modalSeq) + '-t';
+    const dlg = document.createElement('dialog');
+    dlg.className = ('modal ' + lebar).trim();
+    dlg.setAttribute('aria-labelledby', id);
+    dlg.setAttribute('closedby', 'any'); // Esc + klik di luar (Safari: lihat fallback di bawah)
     const tombol = aksi.map((a, i) => html`<button class="btn ${a.kelas || ''}" data-i="${i}" type="button">${a.ikon ? ic(a.ikon, 'sm') : ''}${a.label}</button>`);
-    mount(bg, html`<div class="modal ${lebar}" role="dialog" aria-modal="true" aria-label="${judul}">
-      <div class="modal-h"><h3>${judul}</h3><button class="btn icon sm ghost" data-x aria-label="Tutup">${ic('close', 'sm')}</button></div>
+    mount(dlg, html`<div class="modal-h"><h3 id="${id}">${judul}</h3><button class="btn icon sm ghost" data-x type="button" aria-label="Tutup">${ic('close', 'sm')}</button></div>
       <div class="modal-b">${isi}</div>
-      ${aksi.length ? html`<div class="modal-f">${tombol}</div>` : ''}</div>`);
-    document.body.appendChild(bg);
-    const tutup = v => { bg.remove(); document.removeEventListener('keydown', esc); resolve(v); };
-    const esc = e => { if (e.key === 'Escape') tutup(null); };
-    document.addEventListener('keydown', esc);
-    bg.addEventListener('click', async e => {
-      if (e.target === bg || e.target.closest('[data-x]')) return tutup(null);
+      <div class="modal-msg" aria-live="polite"></div>
+      ${aksi.length ? html`<div class="modal-f">${tombol}</div>` : ''}`);
+    document.body.appendChild(dlg);
+
+    let hasil = null, sibuk = false;
+    const tutup = v => { hasil = v; dlg.close(); };
+    dlg.addEventListener('close', () => { dlg.remove(); resolve(hasil); }, { once: true });
+    // Esc / klik di luar / gestur kembali: tahan selama aksi sedang diproses
+    dlg.addEventListener('cancel', e => { if (sibuk) e.preventDefault(); });
+
+    dlg.addEventListener('click', async e => {
+      if (e.target.closest('[data-x]')) return tutup(null);
       const b = e.target.closest('[data-i]');
-      if (!b) return;
+      if (!b || sibuk) return;
       const a = aksi[+b.dataset.i];
-      if (a.onClick) {
-        b.classList.add('busy');
-        try { const v = await a.onClick(bg); if (v !== false) tutup(v === undefined ? a.nilai : v); }
-        catch (err) { toast(err.message, 'err'); }
-        finally { b.classList.remove('busy'); }
-      } else tutup(a.nilai === undefined ? true : a.nilai);
+      if (!a.onClick) return tutup(a.nilai === undefined ? true : a.nilai);
+      sibuk = true; b.classList.add('busy');
+      $('.modal-msg', dlg).textContent = '';
+      try { const v = await a.onClick(dlg); if (v !== false) tutup(v === undefined ? a.nilai : v); }
+      catch (err) { pesanModal(dlg, err.message, 'err'); }
+      finally { sibuk = false; b.classList.remove('busy'); }
     });
-    if (onBuka) onBuka(bg);
-    setTimeout(() => { const f = bg.querySelector('input,select,textarea'); if (f) f.focus(); }, 30);
+
+    if (!LIGHT_DISMISS) {
+      // Fallback closedby="any": cek posisi pointer (bukan e.target, karena padding
+      // dialog juga ber-target <dialog>); tekan & lepas harus sama-sama di luar.
+      const luar = e => { const r = dlg.getBoundingClientRect(); return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom; };
+      let tekanLuar = false;
+      dlg.addEventListener('pointerdown', e => { tekanLuar = luar(e); });
+      dlg.addEventListener('pointerup', e => { if (tekanLuar && luar(e) && !sibuk) tutup(null); });
+    }
+
+    // Fokus awal: kolom isian pertama; konfirmasi berbahaya → tombol aman (Batal);
+    // selain itu tombol aksi utama (terakhir).
+    const isian = $('input:not([type=hidden]):not(:disabled),select:not(:disabled),textarea:not(:disabled)', dlg);
+    const btn = $$('.modal-f [data-i]', dlg);
+    const bahaya = aksi.some(a => /danger/.test(a.kelas || ''));
+    const awal = isian && isian.type === 'radio' ? ($(`input[type=radio][name="${isian.name}"]:checked`, dlg) || isian)
+      : isian || (bahaya ? btn.find((_, i) => /ghost/.test(aksi[i].kelas || '')) : btn[btn.length - 1]);
+    if (awal) awal.autofocus = true;
+
+    if (onBuka) onBuka(dlg);
+    dlg.showModal();
   });
 }
 function konfirmasi(judul, pesan, label = 'Ya, lanjutkan', kelas = 'primary') {
