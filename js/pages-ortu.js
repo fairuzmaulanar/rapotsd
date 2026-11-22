@@ -10,7 +10,7 @@ route('/portal', {
     let idx = Number(S.ctx.ortuIdx || 0), tab = S.ctx.ortuTab || 'ringkas', d = null;
     mount(view, html`<div class="pub portal">
       <nav class="pub-nav"><div class="in"><a class="brand" href="#/portal"><span class="logo">${ic('auto_stories')}</span><span class="hide-m">RaporKilat SD</span></a>
-        <span class="small muted hide-m">Portal Orang Tua</span><span class="grow"></span>
+        <span class="small muted hide-m">Portal Orang Tua</span>${S.user.demo ? html`<span class="badge warn">Demo</span>` : ''}<span class="grow"></span>
         <span class="row small"><span class="av">${initials(S.user.nama)}</span><span class="hide-m"><b>${S.user.nama}</b></span></span>
         <button class="btn ghost sm" data-keluar>${ic('logout', 'sm')}<span class="hide-m">Keluar</span></button></div></nav>
       <div class="portal-in" data-isi>${skeleton(6)}</div></div>`);

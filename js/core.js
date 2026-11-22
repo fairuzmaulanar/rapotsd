@@ -5,7 +5,7 @@
    ============================================================ */
 'use strict';
 
-const APP_VERSI = '1.5.1';
+const APP_VERSI = '1.5.2';
 
 /* ---------- Utilitas DOM & HTML aman ---------- */
 const $ = (s, el = document) => el.querySelector(s);
@@ -797,6 +797,7 @@ const Shell = (() => {
           <button class="ctx" data-ctx title="Ganti tahun ajaran/semester">${ic('apartment', 'sm')}<span><b data-ctx-sek></b><small data-ctx-per></small></span>${ic('unfold_more', 'sm')}</button>
           <span class="sp"></span>
           <span class="savechip" data-save title="Status simpan otomatis"><span class="dot"></span><span class="lbl-t" data-save-t>Siap</span></span>
+          <span class="badge warn" data-u-demo hidden title="Masuk lewat mode demo (data contoh)">Demo</span>
           <button class="userbtn" data-user aria-label="Menu akun"><span class="u-txt"><div class="u-n" data-u-n></div><div class="u-r" data-u-r></div></span><span class="av" data-u-av></span></button>
         </header>
         <aside class="side" id="menu-utama" aria-label="Menu utama"></aside>
@@ -864,6 +865,7 @@ const Shell = (() => {
     set('[data-u-n]', S.user.nama);
     set('[data-u-r]', (S.user.peran || []).map(p => ({ operator: 'Operator', guru: 'Guru', kepsek: 'Kepala Sekolah' }[p] || p)).join(' · ') + (B.isWali() ? ' · Wali Kelas' : ''));
     set('[data-u-av]', initials(S.user.nama));
+    const db = $('[data-u-demo]'); if (db) db.hidden = !S.user.demo;
   }
   function chipSimpan(i) {
     const el = $('[data-save]'), t = $('[data-save-t]');
@@ -885,7 +887,7 @@ const Shell = (() => {
   async function menuAkun() {
     const v = await modal({ judul: S.user.nama, isi: html`<div class="col">
       <div class="small muted">${S.user.email || ''}</div>
-      <button class="btn ghost" data-a="sandi">${ic('key', 'sm')}Ganti kata sandi</button>
+      ${S.user.demo ? html`<div class="alert">${ic('science')}<div>Akun demo — data contoh. Kata sandi tidak bisa diganti.</div></div>` : html`<button class="btn ghost" data-a="sandi">${ic('key', 'sm')}Ganti kata sandi</button>`}
       <button class="btn ghost" data-a="segar">${ic('sync', 'sm')}Muat ulang data dari server</button>
       <button class="btn danger" data-a="keluar">${ic('logout', 'sm')}Keluar</button></div>`,
       onBuka: bg => $$('[data-a]', bg).forEach(b => b.onclick = () => { bg.querySelector('[data-x]').click(); setTimeout(() => aksiAkun(b.dataset.a), 50); }) });

@@ -99,7 +99,8 @@ route('/persetujuan', {
       const nama = ids.map(id => 'Kelas ' + prog.rombel.find(r => r.id === id).nama).join(', ');
       const v = await modal({ judul: 'Konfirmasi persetujuan', isi: html`<div class="col gap-12">
         <div class="alert ok">${ic('verified_user')}<div><b>${nama}</b><br>Rapor ${jenis === 'STS' ? 'tengah semester' : 'akhir semester'} akan disetujui, dikunci dari perubahan, dan setiap siswa mendapat kode QR verifikasi.</div></div>
-        <div class="field"><label>Konfirmasi kata sandi kepala sekolah</label><input class="input" type="password" name="password" autocomplete="current-password"></div>
+        ${S.user.demo ? html`<div class="alert">${ic('science')}<div>Mode demo: persetujuan tanpa konfirmasi kata sandi.</div></div>`
+          : html`<div class="field"><label>Konfirmasi kata sandi kepala sekolah</label><input class="input" type="password" name="password" autocomplete="current-password"></div>`}
         <p class="xs muted">Persetujuan ini adalah persetujuan dalam aplikasi sekolah (tercatat di audit log), bukan tanda tangan elektronik tersertifikasi BSrE.</p></div>`,
         aksi: [{ label: 'Batal', kelas: 'ghost', nilai: null }, { label: 'Setujui & kunci', kelas: 'ok', ikon: 'done_all', onClick: bg => API.call('setujuiRapor', { rombel_ids: ids, periode_id: S.periodeId, jenis, password: nilaiForm(bg).password }) }] });
       if (!v) return;

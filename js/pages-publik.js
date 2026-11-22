@@ -32,6 +32,11 @@ function terapkanSekolah(root, i) {
   $$('[data-sk-nama]', root).forEach(el => { el.textContent = nama; });
   $$('[data-sk-alamat]', root).forEach(el => { const t = i ? [i.alamat, i.kota].filter(Boolean).join(', ') : ''; el.textContent = t; el.hidden = !t; });
   $$('[data-sk-ta]', root).forEach(el => { el.textContent = (i && i.ta) || ''; el.hidden = !(i && i.ta); });
+  $$('[data-sk-demo]', root).forEach(el => {
+    mount(el, kotakDemo(i && i.demo, el.dataset.skDemo));
+    el.hidden = !el.firstElementChild;
+    el.onclick = e => { const b = e.target.closest('[data-demo]'); if (b && !b.disabled) masukDemo(b.dataset.demo, b); };
+  });
   // P2.6: lupa sandi/PIN → WhatsApp operator (bila nomor WA operator diisi di pengaturan)
   $$('[data-sk-wa]', root).forEach(el => {
     const url = waOperator(i, el.dataset.skWa);
@@ -39,6 +44,34 @@ function terapkanSekolah(root, i) {
       ? html`<a class="btn ghost sm" href="${url}" target="_blank" rel="noopener">${ic('chat', 'sm')}${el.dataset.label || 'Hubungi operator via WhatsApp'}</a>`
       : html`<span>${'tanpa' in el.dataset ? el.dataset.tanpa : 'Hubungi operator sekolah.'}</span>`);
   });
+}
+
+/* ---------- Mode demo: masuk satu klik ke akun contoh (aktif bila operator menyalakannya) ---------- */
+function kotakDemo(list, jenis) {
+  const pilih = (list || []).filter(p => jenis === 'semua' || (jenis === 'ortu' ? p.k === 'ortu' : p.k !== 'ortu'));
+  if (!pilih.length) return '';
+  const judul = jenis === 'ortu' ? 'Coba portal tanpa PIN' : 'Coba aplikasi tanpa sandi';
+  return html`<section class="demo-box" aria-label="${judul}">
+    <div class="row between wrap gap-8"><b class="row">${ic('science', 'sm')}${judul}</b><span class="badge warn">Mode demo</span></div>
+    <p class="xs muted">Data contoh fiktif. Pilih peran untuk langsung masuk.</p>
+    <div class="demo-grid">${pilih.map(p => html`<button type="button" class="demo-btn${p.k === 'ortu' ? ' ortu' : ''}" data-demo="${p.k}">
+      <span class="ic" aria-hidden="true">${p.ikon || 'person'}</span><span class="t"><b>${p.label}</b><small>${p.nama}</small><small class="ket">${p.ket}</small></span></button>`)}</div>
+    ${jenis === 'semua' ? '' : html`<div class="demo-atau"><span>atau masuk dengan ${jenis === 'ortu' ? 'NISN & PIN' : 'akun'}</span></div>`}</section>`;
+}
+async function masukDemo(k, btn) {
+  btn.classList.add('busy');
+  $$('[data-demo]').forEach(b => { b.disabled = true; });
+  try {
+    const r = await API.call('loginDemo', { k });
+    simpanSesi(r.token, r.user);
+    if (k === 'ortu') return go('/portal');
+    S.periodeId = LS.get('rk:periode:' + r.user.id);
+    if (r.boot) terapkanBoot(r.boot); else await muatBoot(true);
+    Simpan.pulihkan();
+    go('/beranda');
+    toast('Anda masuk sebagai ' + r.user.nama + ' (mode demo).', 'info');
+  } catch (ex) { toast(ex.message, 'err'); }
+  finally { btn.classList.remove('busy'); $$('[data-demo]').forEach(b => { b.disabled = false; }); }
 }
 
 function navPublik() {
@@ -93,6 +126,7 @@ route('/', {
             <p class="muted">Scan QR pada rapor, atau ketik kode yang tercetak di bawahnya.</p>
             ${formCekKode()}</div>
         </div>
+        <div class="mt-16" data-sk-demo="semua" hidden></div>
         <div class="row wrap gap-12 mt-16 small">
           <a href="#/panduan">${ic('menu_book', 'sm')} Panduan & fitur aplikasi</a>
           <span data-sk-wa="Halo operator {sekolah}, saya ingin bertanya tentang rapor digital." data-label="Hubungi operator via WhatsApp" data-tanpa=""></span></div>
@@ -115,6 +149,7 @@ route('/masuk', {
       <div class="auth-form"><form class="box col gap-16" data-f novalidate>
         <a class="sk-kepala" href="#/"><span data-sk-logo></span><span><b data-sk-nama></b><small data-sk-ta></small></span></a>
         <div><h1>Masuk</h1><p class="muted mt-8">Untuk operator, guru, wali kelas, dan kepala sekolah.</p></div>
+        <div data-sk-demo="staf" hidden></div>
         <div class="field"><label for="em">Email</label><input class="input" id="em" name="email" type="email" autocomplete="username" required
           spellcheck="false" autocapitalize="none" enterkeyhint="next" aria-invalid="false" placeholder="nama@sekolah.sch.id"></div>
         <div class="field"><label for="pw">Kata sandi</label><div class="row"><input class="input" id="pw" name="password" type="password" autocomplete="current-password" required
@@ -165,6 +200,7 @@ route('/ortu', {
       <div class="auth-form"><form class="box col gap-16" data-f novalidate>
         <a class="sk-kepala" href="#/"><span data-sk-logo></span><span><b data-sk-nama></b><small data-sk-ta></small></span></a>
         <div><h1>Portal Orang Tua</h1><p class="muted mt-8">PIN 6 digit diberikan oleh wali kelas/operator.</p></div>
+        <div data-sk-demo="ortu" hidden></div>
         <div class="field"><label for="ns">NISN ananda</label><input class="input" id="ns" name="nisn" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="username" required
           spellcheck="false" enterkeyhint="next" aria-invalid="false" aria-describedby="ns-h"><small class="xs muted" id="ns-h">10 digit angka, ada di kartu pelajar/rapor.</small></div>
         <div class="field"><label for="pn">PIN</label><div class="row"><input class="input" id="pn" name="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" required

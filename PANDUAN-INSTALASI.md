@@ -281,3 +281,14 @@ Untuk presentasi atau pelatihan, aplikasi bisa diisi data contoh yang tampak nya
 Akun contoh: `kepsek@demo.sch.id`, `wali.1a@demo.sch.id` … `wali.6a@demo.sch.id`, `pai.1@`, `pai.2@`, `pjok@`, `bing@`, `pak@`, `pakat@`, `pah@demo.sch.id` — semuanya memakai sandi dari log.
 
 Sebelum dipakai sungguhan, hapus data contoh: ganti profil sekolah, nonaktifkan/hapus akun `@demo.sch.id`, lalu impor siswa asli.
+
+### Mode demo — masuk satu klik (versi 1.5.2)
+
+Agar pengunjung bisa mencoba tanpa sandi, nyalakan **Mode demo**: masuk sebagai operator → **Profil, Periode & Predikat** → kartu **Mode demo** → **Aktif** → Simpan. (Atau jalankan `aktifkanModeDemo` di editor Apps Script.)
+
+Halaman masuk lalu menampilkan tombol **Kepala Sekolah, Wali Kelas, Guru Bahasa Inggris, Guru PAI, Guru PJOK**, dan di portal orang tua tombol **Wali Murid**. Pengamannya:
+- hanya akun contoh berakhiran `@demo.sch.id` yang bisa dibuka; peran **operator tidak pernah** tersedia lewat tombol demo;
+- akun demo tidak bisa mengganti kata sandi;
+- saat Mode demo dimatikan, tombol hilang dan semua sesi demo langsung berakhir.
+
+**Matikan Mode demo sebelum sekolah memakai data asli.**

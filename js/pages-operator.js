@@ -42,7 +42,11 @@ route('/sekolah', {
             <div class="field span2"><label>Alamat aplikasi (tautan di pesan)</label><div class="row"><input class="input grow" name="url_aplikasi" value="${s.url_aplikasi || ''}" placeholder="https://…github.io/…/">
               <button class="btn ghost" type="button" data-url-ini>Pakai alamat ini</button></div></div></div>
           <p class="xs muted" style="margin:0">Email & WhatsApp dikirim ke data di menu Pengguna & Peran. Email berakhiran @sekolah.id dan @demo.sch.id dilewati.</p>
-          <div><button class="btn ghost sm" type="button" data-uji-notif>${ic('send', 'sm')}Kirim email uji ke saya</button></div></div></form></div>
+          <div><button class="btn ghost sm" type="button" data-uji-notif>${ic('send', 'sm')}Kirim email uji ke saya</button></div></div></form>
+      <form class="card" data-demo-f><div class="card-h"><h3>${ic('science')}Mode demo</h3><button class="btn sm primary" type="submit">${ic('save', 'sm')}Simpan</button></div>
+        <div class="pad col gap-12"><p class="small muted" style="margin:0">Menampilkan tombol <b>masuk satu klik</b> (kepala sekolah, wali kelas, guru mapel, wali murid) di halaman masuk — hanya untuk akun contoh berakhiran <b>@demo.sch.id</b>. Peran operator tidak pernah tersedia lewat mode demo.</p>
+          <div class="field"><label for="mode-demo">Status</label><select class="select" id="mode-demo" name="mode_demo"><option value="tidak">Nonaktif</option><option value="ya" ${s.mode_demo === 'ya' ? raw('selected') : ''}>Aktif — tampilkan tombol demo</option></select></div>
+          <div class="alert warn small">${ic('warning', 'sm')}<div>Matikan sebelum sekolah memakai data asli. Saat dimatikan, semua sesi demo langsung berakhir.</div></div></div></form></div>
       <div class="col gap-16"><div class="card"><div class="card-h"><h3>${ic('event')}Tahun ajaran & semester</h3><button class="btn sm primary" data-periode-baru>${ic('add', 'sm')}Periode baru</button></div>
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Tahun ajaran</th><th>Semester</th><th>Tgl rapor STS / SAS</th><th>Status</th><th></th></tr></thead>
         <tbody>${sortBy(S.boot.periode, x => x.tahun_ajaran + x.semester).reverse().map(x => html`<tr><td><b>${x.tahun_ajaran}</b></td><td>${x.semester}</td><td class="small">${tglID(x.tgl_rapor_sts) || '–'} / ${tglID(x.tgl_rapor_sas) || '–'}</td>
@@ -73,6 +77,7 @@ route('/sekolah', {
     $('[data-profil]', view).onsubmit = e => simpanForm(e, 'Profil sekolah');
     $('[data-aturan]', view).onsubmit = e => simpanForm(e, 'Aturan rapor');
     $('[data-notif]', view).onsubmit = e => simpanForm(e, 'Pengaturan notifikasi');
+    $('[data-demo-f]', view).onsubmit = e => simpanForm(e, 'Mode demo');
     $('[data-url-ini]', view).onclick = () => { $('[name=url_aplikasi]', view).value = location.origin + location.pathname; };
     view.addEventListener('click', async e => {
       if (e.target.closest('[data-tambah-pred]')) { $('[data-pred]', view).insertAdjacentHTML('beforeend', TT.html(barisPred())); }

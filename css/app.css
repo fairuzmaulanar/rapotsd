@@ -485,3 +485,21 @@ body.pantau .savechip { display: none; }
   dialog.modal { border: 1px solid CanvasText; }
   .toast { border: 1px solid CanvasText; }
 }
+
+/* ---------- v1.5.2 · Mode demo: masuk satu klik ---------- */
+.demo-box { border: 1px dashed var(--primary); background: #f5f7ff; background: color-mix(in srgb, var(--primary) 5%, var(--surface)); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.demo-box > p { margin: 0; }
+.demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr)); gap: 8px; }
+.demo-btn { display: flex; align-items: flex-start; gap: 10px; text-align: left; padding: 10px 12px; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; }
+.demo-btn:hover { border-color: var(--primary); box-shadow: var(--sh-1); }
+.demo-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.demo-btn .ic { color: var(--primary); font-size: 1.375rem; flex: none; }
+.demo-btn.ortu .ic { color: var(--ok, #047857); }
+.demo-btn .t { display: flex; flex-direction: column; min-width: 0; }
+.demo-btn .t b { font-size: 0.875rem; }
+.demo-btn .t small { font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.demo-btn .t .ket { white-space: normal; }
+.demo-btn.busy { opacity: .6; pointer-events: none; }
+.demo-atau { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.75rem; margin-top: 4px; }
+.demo-atau::before, .demo-atau::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.portal-sk [data-sk-demo] .demo-box { background: var(--surface); }
