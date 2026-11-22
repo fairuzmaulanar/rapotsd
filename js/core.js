@@ -5,7 +5,7 @@
    ============================================================ */
 'use strict';
 
-const APP_VERSI = '1.5.0';
+const APP_VERSI = '1.5.1';
 
 /* ---------- Utilitas DOM & HTML aman ---------- */
 const $ = (s, el = document) => el.querySelector(s);

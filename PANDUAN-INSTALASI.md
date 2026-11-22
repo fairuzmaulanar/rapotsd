@@ -265,3 +265,19 @@ Yang berubah bagi pengguna:
 - Bila ukuran teks HP/komputer diperbesar di pengaturan, aplikasi ikut membesar tanpa terpotong.
 
 **Bila Anda mengubah kode sendiri:** aplikasi kini mewajibkan *Trusted Types*. Menulis `elemen.innerHTML = '...'` langsung akan ditolak browser (muncul galat di Console). Gunakan `` mount(elemen, html`...`) `` seperti kode yang sudah ada.
+
+---
+
+## BAGIAN I — Data contoh lengkap untuk demo (versi 1.5.1)
+
+Untuk presentasi atau pelatihan, aplikasi bisa diisi data contoh yang tampak nyata: 1 sekolah fiktif, kepala sekolah + 13 guru, 6 rombel (kelas 1A–6A), ±160 siswa, TP dan nilai semua mapel, absensi, ekskul, catatan wali, kokurikuler, rapor tengah semester yang sudah disetujui/dikunci, dan portal orang tua.
+
+1. Di editor Apps Script, pilih fungsi **`isiDataDummy`** di daftar fungsi → **Jalankan**. Tunggu ±2–3 menit.
+2. Buka **Log eksekusi**. Catat **sandi akun contoh** dan **NISN/PIN orang tua** — hanya tampil sekali.
+3. Bila log menulis *"Jalankan isiDataDummy SEKALI LAGI"*, jalankan lagi — proses dilanjutkan, data tidak dihapus ulang.
+
+**Perhatian:** semua data siswa, rombel, nilai, rapor, ekskul, dan audit yang ada **dihapus**. Sebelumnya dibuat salinan cadangan spreadsheet di Google Drive ("Cadangan sebelum data dummy — tanggal"). Akun operator Anda tidak dihapus. Akun contoh berakhiran `@demo.sch.id` dan tidak pernah dikirimi email.
+
+Akun contoh: `kepsek@demo.sch.id`, `wali.1a@demo.sch.id` … `wali.6a@demo.sch.id`, `pai.1@`, `pai.2@`, `pjok@`, `bing@`, `pak@`, `pakat@`, `pah@demo.sch.id` — semuanya memakai sandi dari log.
+
+Sebelum dipakai sungguhan, hapus data contoh: ganti profil sekolah, nonaktifkan/hapus akun `@demo.sch.id`, lalu impor siswa asli.

@@ -113,7 +113,13 @@ function isiBeranda(d) {
       <div class="row between xs muted"><span>Rata-rata NA: <b class="pri-t">${fmt1(m.rata)}</b></span>${m.remedial ? html`<span class="err-t">${m.remedial} remedial</span>` : html`<span>${m.updated_at ? 'Diubah ' + jamID(m.updated_at) : ''}</span>`}</div></a>`;
   };
   const totalSiswa = d.rombel.reduce((s, r) => s + r.jumlah, 0);
-  const cnt = st => d.rombel.filter(r => r.status.SAS.status === st).length;
+  // Status rapor yang sedang berjalan: SAS bila sudah dimulai, selain itu STS (tengah semester) bila sudah diproses.
+  const stAktif = r => {
+    const sas = r.status.SAS || { status: 'draft' }, sts = r.status.STS || { status: 'draft' };
+    return sas.status !== 'draft' || sts.status === 'draft' ? Object.assign({ jenis: 'SAS' }, sas) : Object.assign({ jenis: 'STS' }, sts);
+  };
+  const badgeAktif = r => { const a = stAktif(r); return html`<span class="row" style="gap:6px"><span class="xs muted bold">${a.jenis}</span>${badgeStatus(a.status)}</span>`; };
+  const cnt = st => d.rombel.filter(r => stAktif(r).status === st).length;
   const rataProg = d.rombel.length ? Math.round(d.rombel.reduce((s, r) => s + r.persen, 0) / d.rombel.length) : 0;
   const ceklist = S.peran('operator') ? [
     [!!S.pengaturan.nama_sekolah && S.pengaturan.nama_sekolah !== 'SD Contoh', 'Isi profil sekolah & kepala sekolah', '#/sekolah'],
@@ -131,17 +137,17 @@ function isiBeranda(d) {
       <div class="card kpi"><div class="k-l">Disetujui / terkunci<span class="k-ic">${ic('verified', 'sm')}</span></div><div class="k-v ok-t">${cnt('disetujui') + cnt('terkunci')}</div><div class="k-s">${cnt('revisi')} perlu perbaikan</div></div></div>` : ''}
     ${waliRb.length ? html`<div class="card pad mb-12"><div class="row between wrap"><h3 class="row">${ic('co_present')}Kelas perwalian</h3></div>
       <div class="mcards mt-12">${waliRb.map(r => html`<div class="card mcard" style="box-shadow:none;border:1px solid var(--line)">
-        <div class="row between"><b>Kelas ${r.nama}</b>${badgeStatus(r.status.SAS.status)}</div>
+        <div class="row between"><b>Kelas ${r.nama}</b>${badgeAktif(r)}</div>
         <div class="small muted">${r.jumlah} siswa · progres nilai ${r.persen}% ${r.mapelTanpaTP ? '· ' + r.mapelTanpaTP + ' mapel belum ada TP' : ''}</div>
         <div class="bar"><i style="width:${r.persen}%"></i></div>
-        ${r.status.SAS.status === 'revisi' && r.status.SAS.catatan ? html`<div class="alert err small">${ic('feedback', 'sm')}<span>${r.status.SAS.catatan}</span></div>` : ''}
+        ${stAktif(r).status === 'revisi' && stAktif(r).catatan ? html`<div class="alert err small">${ic('feedback', 'sm')}<span><b>Rapor ${stAktif(r).jenis} dikembalikan:</b> ${stAktif(r).catatan}</span></div>` : ''}
         <div class="row wrap"><a class="btn sm" href="#/kelas" data-rb="${r.id}">Absensi & catatan</a><a class="btn sm" href="#/kokurikuler" data-rb="${r.id}">Kokurikuler</a><a class="btn sm primary" href="#/rapor" data-rb="${r.id}">Leger & rapor</a></div></div>`)}</div></div>` : ''}
     ${mrSaya.length ? html`<div class="card pad mb-12"><h3 class="row">${ic('grid_on')}Mapel yang saya ampu</h3><div class="mcards mt-12">${mrSaya.map(kartuMr)}</div></div>` : ''}
     ${admin ? html`<div class="card"><div class="card-h"><h3>${ic('monitoring')}Progres per rombel</h3><a class="btn sm ghost" href="#/monitoring">Detail</a></div>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Rombel</th><th>Wali kelas</th><th class="c">Siswa</th><th style="min-width:160px">Progres nilai</th><th class="c">Rata NA</th><th>Status rapor</th></tr></thead>
       <tbody>${d.rombel.map(r => html`<tr><td><b>Kelas ${r.nama}</b> <span class="badge">Fase ${r.fase}</span></td><td>${B.user(r.wali_id).nama || html`<span class="err-t small">Belum ditetapkan</span>`}</td>
         <td class="c">${r.jumlah}</td><td><div class="row"><div class="bar grow"><i style="width:${r.persen}%"></i></div><span class="small bold">${r.persen}%</span></div></td>
-        <td class="c">${fmt1(r.rata)}</td><td>${badgeStatus(r.status.SAS.status)}</td></tr>`)}</tbody></table></div>
+        <td class="c">${fmt1(r.rata)}</td><td>${badgeAktif(r)}</td></tr>`)}</tbody></table></div>
       ${!d.rombel.length ? kosong('meeting_room', 'Belum ada rombel', 'Operator membuat rombel di menu Rombel & Pengampu.') : ''}</div>` : ''}
     ${!admin && !mrSaya.length && !waliRb.length ? kosong('hourglass_empty', 'Belum ada tugas', 'Anda belum ditetapkan sebagai pengampu mapel atau wali kelas pada periode ini.') : ''}`;
 }
